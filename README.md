@@ -43,4 +43,10 @@ bash _run_speculative_decoding.sh
 
 #### Infilling Tasks
 
-TODO
+For the NLP infills, first download [ROCStories](https://github.com/HKUNLP/DiffuLLaMA/blob/main/evaluation/evaluation/cloze_test_val__spring2016.csv), and put it in ```eval_datasets``` folder. Then,
+
+```
+bash _run_nlp_infill_eval.sh
+```
+
+TODO: code infills
