@@ -12,7 +12,11 @@
 
 # TODO: 
 # change --output_dir
+# select "openwebtext" or "bigcode/starcoderdata" dataset
 # change batch_size as desired
+
+#dataset="openwebtext"
+dataset="bigcode/starcoderdata"
 
 python -m torch.distributed.launch \
     --nproc_per_node=1 finetune_xlnet_distributed.py \
@@ -28,4 +32,5 @@ python -m torch.distributed.launch \
     --eval_masking_rate 0.95 \
     --eval_num_decodes 2 \
     --wandb_project "finetune_xlnet_comparisons" \
-    --packed_dataset
+    --packed_dataset \
+    --dataset $dataset
