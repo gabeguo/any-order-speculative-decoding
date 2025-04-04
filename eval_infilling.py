@@ -5,7 +5,7 @@ os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
 import csv, json
 import evaluate
 import torch
-from run_decoding import regular_decoding
+from run_decoding_eval import regular_decoding
 from speculative_decoding import speculative_decoding
 import argparse
 from transformers import AutoTokenizer, XLNetLMHeadModel
