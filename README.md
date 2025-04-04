@@ -21,13 +21,15 @@ You'll need to change the directories, batch sizes, etc.
 
 An A4000 (16GB) should support a batch size of 6, A5000 (24GB) should support a batch size of 8, A6000 (48GB) should support a batch size of 16. Gradient accumulation and distributed training are your friends.
 
+In the .sh script, set the dataset to "bigcode/starcoderdata" or "openwebtext".
+
 ```
 bash _run_training.sh
 ```
 
 #### Download Them
 
-Download here: [https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main](https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main)
+Training takes a long time. We're nice, so you can freely download our models here: [https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main](https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main)
 
 ### Evaluations
 
