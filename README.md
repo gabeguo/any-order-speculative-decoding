@@ -5,6 +5,14 @@
 Python 3.10.16
 ```pip install -r requirements.txt```
 
+TODO: debug
+
+You need at least one GPU with 16GB, such as an A4000.
+
+The commands also generally work with sbatch, if you're using slurm.
+
 ## How to Run
 
-TBD
+```
+bash _run_speculative_decoding.sh
+```
