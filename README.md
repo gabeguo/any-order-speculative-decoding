@@ -13,11 +13,17 @@ The commands also generally work with sbatch, if you're using slurm.
 
 ## How to Run
 
+You'll need to change the directories, batch sizes, etc. 
+
 ### Getting Models
 
 #### Train Yourself
 
-TODO
+An A4000 (16GB) should support a batch size of 6, A5000 (24GB) should support a batch size of 8, A6000 (48GB) should support a batch size of 16. Gradient accumulation and distributed training are your friends.
+
+```
+bash _run_training.sh
+```
 
 #### Download Them
 

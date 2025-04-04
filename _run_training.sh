@@ -10,6 +10,10 @@
 #SBATCH --cpus-per-task=8       # CPUs for the job
 #SBATCH --ntasks=1            # Number of tasks (one per GPU)
 
+# TODO: 
+# change --output_dir
+# change batch_size as desired
+
 python -m torch.distributed.launch \
     --nproc_per_node=1 finetune_xlnet_distributed.py \
     --batch_size 8 --accumulation_steps 4 \
