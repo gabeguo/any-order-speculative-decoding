@@ -5,8 +5,7 @@ numpy==1.25.0
 pandas==2.2.3
 python-dotenv==1.0.1
 scipy==1.15.2
-torch==2.5.0+cu124
+torch==2.5.0
 tqdm==4.67.1
 transformers==4.48.3
 wandb==0.13.5
-~orch==2.0.1+cu118
