@@ -5,7 +5,7 @@
 Python 3.10.16
 ```pip install -r requirements.txt```
 
-TODO: verify this
+You also need to install [https://github.com/openai/human-eval-infilling](https://github.com/openai/human-eval-infilling)
 
 You need at least one GPU with 16GB, such as an A4000.
 
