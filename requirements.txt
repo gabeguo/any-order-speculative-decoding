@@ -9,3 +9,6 @@ torch==2.5.0
 tqdm==4.67.1
 transformers==4.48.3
 wandb==0.13.5
+absl-py
+nltk
+rouge-score
