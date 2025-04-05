@@ -43,10 +43,20 @@ bash _run_speculative_decoding.sh
 
 #### Infilling Tasks
 
-For the NLP infills, first download [ROCStories](https://github.com/HKUNLP/DiffuLLaMA/blob/main/evaluation/evaluation/cloze_test_val__spring2016.csv), and put it in ```eval_datasets``` folder. Then,
+#### *NLP*
+
+For the human language infills, first download [ROCStories](https://github.com/HKUNLP/DiffuLLaMA/blob/main/evaluation/evaluation/cloze_test_val__spring2016.csv), and put it in ```eval_datasets``` folder. Then,
 
 ```
 bash _run_nlp_infill_eval.sh
 ```
 
-TODO: code infills
+#### *Code*
+
+For the code infills, run:
+
+```
+bash _run_code_infill_eval.sh
+```
+
+You will need to use the evaluation suite here to get metrics: [https://github.com/openai/human-eval-infilling](https://github.com/openai/human-eval-infilling)
