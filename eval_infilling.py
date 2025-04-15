@@ -166,7 +166,7 @@ def parse_args():
 
 def main(args):
     if args.finetuned_model_dir == PRETRAINED_MODEL:
-        print(f"Loading pretrained model from {PRETRAINED_MODEL}")
+        print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
         model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
