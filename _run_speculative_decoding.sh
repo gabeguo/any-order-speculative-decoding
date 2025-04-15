@@ -14,14 +14,16 @@
 output_dir="/atlas/u/gabeguo/dummy_runs/speculative_decoding"
 
 python run_decoding_eval.py \
-    --finetuned_model_dir /atlas/u/gabeguo/finetune_xlnet/03_08_25/narrow_mask_rate_range/0_9_to_0_99/2025-03-10_122308/checkpoint-75000 \
+    --finetuned_model_dir therealgabeguo/ASARM \
     --start_percentage 0.05 \
     --num_trials 100 \
     --eps 0 \
     --k 5 \
     --T 1 \
-    --output_dir $output_dir
+    --output_dir $output_dir \
+    --skip_off_the_shelf
 python eval_perplexity.py \
     --perplexity_model "gpt2-large" \
     --batch_size 4 \
-    --results_dir $output_dir
+    --results_dir $output_dir \
+    --skip_off_the_shelf
