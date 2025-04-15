@@ -11,6 +11,6 @@
 #SBATCH --ntasks=1             # Number of tasks (one per GPU)
 
 python eval_coding.py \
-    --finetuned_model_dir "/atlas/u/gabeguo/finetune_xlnet/03_14_25/learn_to_code/2025-03-14_124247/checkpoint-75000" \
+    --finetuned_model_dir therealgabeguo/ASARM \
     --output_dir "/atlas/u/gabeguo/dummy_runs/coding" \
     --max_tasks 2000

@@ -15,6 +15,8 @@ SPECIAL_CHARACTER_MAPPINGS = {
     " " * 3: "<pad>"
 }
 
+PRETRAINED_MODEL = "therealgabeguo/ASARM"
+
 def create_output_path(args):
     # Create datetime subfolder in format YYYY-MM-DD_HHMMSS
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
@@ -48,7 +50,7 @@ def create_sigma(input_ids, mask_token_id=6):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--finetuned_model_dir", type=str, default="/atlas/u/gabeguo/finetune_xlnet/03_14_25/learn_to_code/2025-03-14_124247/checkpoint-75000")
+    parser.add_argument("--finetuned_model_dir", type=str, default=PRETRAINED_MODEL)
     parser.add_argument("--output_dir", type=str, default="/atlas/u/gabeguo/humaneval_infill_results")
     parser.add_argument("--max_tasks", type=int, default=2000)
     return parser.parse_args()
@@ -58,10 +60,18 @@ def main(args):
 
     num_samples_per_task = 1
 
-    model = XLNetLMHeadModel.from_pretrained(
-        args.finetuned_model_dir,
-        local_files_only=True,
-        use_safetensors=True).cuda()
+    if args.finetuned_model_dir == PRETRAINED_MODEL:
+        print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
+        model = XLNetLMHeadModel.from_pretrained(
+            PRETRAINED_MODEL,
+            use_safetensors=True,
+            revision="code").cuda()
+    else:
+        print(f"Loading finetuned model from {args.finetuned_model_dir}")
+        model = XLNetLMHeadModel.from_pretrained(
+            args.finetuned_model_dir,
+            local_files_only=True,
+            use_safetensors=True).cuda()
     tokenizer = AutoTokenizer.from_pretrained("xlnet/xlnet-base-cased")
 
     samples = list()
