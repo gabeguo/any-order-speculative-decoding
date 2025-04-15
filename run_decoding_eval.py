@@ -30,12 +30,14 @@ CODE_SPECIAL_CHARACTER_MAPPINGS = {
     "<pad>": " " * 3
 }
 
+PRETRAINED_MODEL = "therealgabeguo/ASARM"
+
 # TODO: rename this file
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--print_steps", action="store_true")
-    parser.add_argument("--finetuned_model_dir", type=str, default="/atlas/u/gabeguo/finetune_xlnet/02_11_25/checkpoint-9000")
+    parser.add_argument("--finetuned_model_dir", type=str, default=PRETRAINED_MODEL)
     parser.add_argument("--ngram_model", action="store_true")
     parser.add_argument("--start_percentage", type=float, default=0.1)
     parser.add_argument("--k", type=int, default=15)
@@ -92,10 +94,18 @@ def main(args):
     baseline_model = baseline_model.to("cuda")
     baseline_model.eval()
     # Fine-tuned
-    finetuned_model = XLNetLMHeadModel.from_pretrained(
-        args.finetuned_model_dir,
-        local_files_only=True,
-        use_safetensors=True)
+    if args.finetuned_model_dir == PRETRAINED_MODEL:
+        print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
+        finetuned_model = XLNetLMHeadModel.from_pretrained(
+            PRETRAINED_MODEL,
+            use_safetensors=True,
+            revision="nlp") # pull from nlp branch
+    else:
+        print(f"Loading finetuned model from {args.finetuned_model_dir}")
+        finetuned_model = XLNetLMHeadModel.from_pretrained(
+            args.finetuned_model_dir,
+            local_files_only=True,
+            use_safetensors=True)
     finetuned_model = finetuned_model.to("cuda")
     finetuned_model.eval()
 
