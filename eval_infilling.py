@@ -13,6 +13,8 @@ from datetime import datetime
 from tqdm import tqdm
 import numpy as np
 
+PRETRAINED_MODEL = "therealgabeguo/ASARM"
+
 def create_output_path(args):
     # Create datetime subfolder in format YYYY-MM-DD_HHMMSS
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
@@ -163,7 +165,13 @@ def parse_args():
     return parser.parse_args()
 
 def main(args):
-    if args.finetuned_model_dir is not None:
+    if args.finetuned_model_dir == PRETRAINED_MODEL:
+        print(f"Loading pretrained model from {PRETRAINED_MODEL}")
+        model = XLNetLMHeadModel.from_pretrained(
+            PRETRAINED_MODEL,
+            use_safetensors=True,
+            revision="nlp") # pull from nlp branch
+    elif args.finetuned_model_dir is not None:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         model = XLNetLMHeadModel.from_pretrained(
             args.finetuned_model_dir,
