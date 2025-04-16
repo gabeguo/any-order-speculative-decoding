@@ -82,8 +82,9 @@ def eval_infilling(model, tokenizer, args):
     infill_lengths = list()
 
     print(len(problems))
-
-    for stories in tqdm(problems[:args.max_items]):
+    for the_trial in range(args.num_trials): # have multiple trials
+      print(f"Trial {the_trial}")
+      for stories in tqdm(problems[:args.max_items]):
         print("\n\n")
         total_cnt += 1
         # import pdb; pdb.set_trace();
@@ -161,6 +162,7 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="/atlas/u/gabeguo/eval_infilling")
     parser.add_argument("--T", type=float, default=1)
     parser.add_argument("--max_items", type=int, default=50)
+    parser.add_argument("--num_trials", type=int, default=1)
     parser.add_argument("--short_prompt", action="store_true")
     return parser.parse_args()
 

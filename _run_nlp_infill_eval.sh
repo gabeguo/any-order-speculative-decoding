@@ -15,13 +15,23 @@
 # and put it in the eval_datasets folder
 
 max_items=2000
+num_trials=5
 T=1
 
 for prompting in "--short_prompt" ""; do
-    output_dir="/atlas/u/gabeguo/dummy_runs/nlp_infill/prompting_${prompting}"
+    output_dir="/atlas/u/gabeguo/neurips_large_sample/nlp_infill/prompting_${prompting}"
+    output_dir_finetuned="${output_dir}/xlnet_finetuned"
     python eval_infilling.py $prompting \
         --max_items $max_items \
+        --num_trials $num_trials \
         --finetuned_model_dir therealgabeguo/ASARM \
-        --output_dir $output_dir \
+        --output_dir $output_dir_finetuned \
+        --T $T
+
+    output_dir_off_the_shelf="${output_dir}/xlnet_off_the_shelf"
+    python eval_infilling.py $prompting \
+        --max_items $max_items \
+        --num_trials $num_trials \
+        --output_dir $output_dir_off_the_shelf \
         --T $T
 done
