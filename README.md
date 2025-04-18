@@ -1,8 +1,12 @@
 # Reviving Any-Subset Autoregressive Models via Principled Parallel Sampling and Speculative Decoding
 
-By [Gabe Guo](https://gabeguo.github.io/) and [Stefano Ermon](https://cs.stanford.edu/~ermon/).
+**By [Gabe Guo](https://gabeguo.github.io/) and [Stefano Ermon](https://cs.stanford.edu/~ermon/).**
 
-![AS-ARM animation](assets/asarm.gif)
+*In arbitrary-order language models, it is an open question how to sample tokens in parallel from the correct joint distribution. With [discrete diffusion models](https://arxiv.org/abs/2310.16834), the more tokens they generate in parallel, the less their predicted distributions adhere to the originally learned data distribution, as they rely on a conditional independence assumption that only works with infinitesimally small timesteps. We find that a different class of models, [**Any-Subset Autoregressive Models (AS-ARMs)**](https://github.com/AndyShih12/mac), holds the solution. As implied by the name, AS-ARMs can generate tokens in any order, and in parallel. Moreover, AS-ARMs support parallelized joint probability density estimation, allowing them to correct their own parallel-generated token distributions, via our **Any-Subset Speculative Decoding (ASSD)** algorithm. ASSD provably enables generation of tokens from the correct joint distribution, with the number of neural network calls upper bounded by the number of tokens predicted.
+We empirically verify that ASSD speeds up language generation, without sacrificing quality. Furthermore, we provide a mathematically justified scheme for training AS-ARMs for generation, and show that AS-ARMs achieve **state-of-the-art performance among sub-200M parameter models** on infilling benchmark tasks, and nearly **match the performance of models 50X larger** on code generation. 
+Our theoretical and empirical results indicate that the once-forgotten AS-ARMs are a promising direction of language modeling.*
+
+<img src="asarm.gif" width=400>
 
 ## Requirements
 
@@ -64,3 +68,15 @@ bash _run_code_infill_eval.sh
 ```
 
 You will need to use the evaluation suite here to get metrics: [https://github.com/openai/human-eval-infilling](https://github.com/openai/human-eval-infilling)
+
+## Citations
+
+If you find the code and/or ideas in this repository helpful, please cite
+```
+@article{guo2025_asarm,
+  title={Reviving Any-Subset Autoregressive Models via Principled Parallel Sampling and Speculative Decoding},
+  author={Guo, Gabe and Ermon, Stefano},
+  journal={arXiv preprint},
+  year={2025}
+}
+```
