@@ -37,7 +37,7 @@ bash _run_training.sh
 
 #### Download Them
 
-Training takes a long time. We're nice, so you can freely download our models here: [https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main](https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main)
+Training takes a few days, even if you have a few A100s. We're nice, so you can freely download our models here: [https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main](https://huggingface.co/therealgabeguo/AO-ARM-generative/tree/main). Our code also automatically loads the models from Huggingface by default.
 
 ### Evaluations
 
