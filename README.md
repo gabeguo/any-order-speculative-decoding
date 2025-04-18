@@ -1,5 +1,9 @@
 # Reviving Any-Subset Autoregressive Models via Principled Parallel Sampling and Speculative Decoding
 
+By [Gabe Guo](https://gabeguo.github.io/) and [Stefano Ermon](https://cs.stanford.edu/~ermon/).
+
+![AS-ARM animation](assets/asarm.gif)
+
 ## Requirements
 
 Python 3.10.16
