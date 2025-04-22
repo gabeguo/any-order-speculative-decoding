@@ -46,6 +46,8 @@ FULL_ATTN = "prompt_and_decoded"
 PROMPT_ATTN = "prompt_only"
 CAUSAL_ATTN = "causal"
 
+PRETRAINED_MODEL = "therealgabeguo/ASARM"
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Fine-tune XLNet model on OpenWebText dataset')
     
@@ -92,6 +94,7 @@ def parse_args():
     parser.add_argument('--save_steps', type=int, default=1000)
     parser.add_argument('--no_cuda', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--use_hf_model', action='store_true')
     
     args = parser.parse_args()
     return args
@@ -448,8 +451,14 @@ def main():
     min_masking_rate = args.start_masking_rate
     max_masking_rate = args.start_masking_rate + 1e-5
     
+    if args.use_hf_model:
+        print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
+        model = XLNetLMHeadModel.from_pretrained(
+            PRETRAINED_MODEL,
+            use_safetensors=True,
+            revision="nlp") # pull from nlp branch
     # Load from checkpoint if specified
-    if args.checkpoint_path is not None:
+    elif args.checkpoint_path is not None:
         print(f"Loading model and training state from checkpoint: {args.checkpoint_path}")
         # Load model
         model = XLNetLMHeadModel.from_pretrained(args.checkpoint_path)
