@@ -4,7 +4,7 @@ export GPU_NUM_DEVICES=16  # Or the number of GPUs you have
 dataset="openwebtext"
 
 python -m torch.distributed.launch \
-    --nproc_per_node=1 finetune_xlnet_distributed.py \
+    --nproc_per_node=16 finetune_xlnet_distributed.py \
     --batch_size 12 --accumulation_steps 2 \
     --learning_rate 1e-5 \
     --warmup_steps 5000 --masking_warmup_steps 5000 \
