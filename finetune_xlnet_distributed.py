@@ -1,5 +1,5 @@
 import os
-os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
+# os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
 os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
 from dotenv import load_dotenv
 load_dotenv()
