@@ -5,7 +5,7 @@ dataset="openwebtext"
 
 python -m torch.distributed.launch \
     --nproc_per_node=16 finetune_xlnet_distributed.py \
-    --batch_size 12 --accumulation_steps 2 \
+    --batch_size 16 --accumulation_steps 2 \
     --learning_rate 1e-5 \
     --warmup_steps 5000 --masking_warmup_steps 5000 \
     --start_masking_rate 0.90 --final_min_masking_rate 0.90 --final_max_masking_rate 0.99 \
