@@ -1,3 +1,5 @@
+export PJRT_DEVICE=CUDA
+export GPU_NUM_DEVICES=16  # Or the number of GPUs you have
 
 dataset="openwebtext"
 
