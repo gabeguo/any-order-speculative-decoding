@@ -9,6 +9,7 @@ python -m torch.distributed.launch \
     --start_masking_rate 0.90 --final_min_masking_rate 0.90 --final_max_masking_rate 0.99 \
     --items_per_epoch $((120*1000*1000)) --num_epochs 1 \
     --perm_mask_type joint \
+    --cache_dir hf_cache \
     --output_dir train_nlp \
     --loss_scale_type scale_by_none \
     --eval_steps 5000 \
