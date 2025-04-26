@@ -452,11 +452,18 @@ def main():
     max_masking_rate = args.start_masking_rate + 1e-5
     
     if args.use_hf_model:
+        if args.dataset == OPENWEBTEXT_DATASET:
+            revision = "nlp"
+        elif args.dataset == CODE_DATASET:
+            revision = "code"
+        else:
+            raise ValueError(f"Invalid dataset: {args.dataset}")
+        print(f"Model version: {revision}")
         print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
         model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
-            revision="nlp") # pull from nlp branch
+            revision=revision)
     # Load from checkpoint if specified
     elif args.checkpoint_path is not None:
         print(f"Loading model and training state from checkpoint: {args.checkpoint_path}")
