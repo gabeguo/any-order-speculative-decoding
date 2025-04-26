@@ -46,15 +46,13 @@ class XLNetRelativeAttentionAOKVCache(XLNetRelativeAttention):
             # Create batch and head indices that will select all elements
             assert bd.shape[:3] == ac.shape[:3], f"{bd.shape} vs {ac.shape}"
             desired_shape = (bd.shape[0], bd.shape[1], bd.shape[2], seqlen)
-            batch_idx = torch.arange(bd.shape[0]).view(bd.shape[0], 1, 1, 1).expand(desired_shape)
-            head_idx = torch.arange(bd.shape[1]).view(1, bd.shape[1], 1, 1).expand(desired_shape)
-            row_idx = torch.arange(bd.shape[2]).view(1, 1, bd.shape[2], 1).expand(desired_shape)
             # Column indices are offsets, based on the query indices: this will give us the RPEs corresponding to keys 0->seqlen-1
             col_offsets = seqlen - query_indices.view(1, 1, query_indices.shape[0], 1).expand(desired_shape)
             col_indices = col_offsets + torch.arange(seqlen).view(1, 1, 1, seqlen).expand(desired_shape).to(bd.device)
             assert col_indices.shape == row_idx.shape
             
-            bd = bd[batch_idx, head_idx, row_idx, col_indices]
+            bd = torch.gather(bd, dim=3, index=col_indices)
+
             assert bd.shape == desired_shape, f"{bd.shape} vs {desired_shape}"
         
             # Now permute the columns
