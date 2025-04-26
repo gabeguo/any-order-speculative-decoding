@@ -20,7 +20,6 @@ def create_gt_perm_mask(sigma, seqlen, select_conditioning):
     perm_mask = perm_mask.to(device="cuda")
     return perm_mask
 
-# TODO: adaptive order
 def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_token=6, vocab_size=32000, adaptive_order=False, k=10, print_steps=False, eps=0, T=1, ngram_model=False, no_temp_oracle=False):
     if print_steps:
         if ngram_model:
@@ -39,7 +38,6 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
     # New Sequence
     new_sequence = prompt_tokens.clone()
     assert torch.all(new_sequence[sigma >= start] == mask_token) # Mask out the ones we're not conditioning on (later order)
-    # # print(f"New Sequence: {tokenizer.decode(new_sequence[0]).replace('<mask>', '_')}")
 
     assert torch.sum(new_sequence != mask_token) == start, f"num decoded: {torch.sum(new_sequence != mask_token)}; start: {start}" # num decoded equals start
 
@@ -110,13 +108,8 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                     assert curr_pred_probs[the_sample["sampled_token"]] == the_sample["sampled_token_prob"]
                     assert curr_pred_probs.shape == (vocab_size,)
                     pred_probs[idx_s] = curr_pred_probs # set the probs for the n + idx_s-th decoded token
-                    sample[idx_s] = the_sample["sampled_token"] # torch.multinomial(curr_pred_probs, num_samples=1).item() # sample next token, so we can condition on it next iteration
-                    # print(f"sample: {sample[idx_s]} vs n-gram sample: {the_sample['sampled_token']}") # DONE: The n-gram sample is consistent with the torch sample (previously had multinomial here)
-                    # print(f"query: {tokenizer.decode([n_gram_query])}; sample: {tokenizer.decode([sample[idx_s]])}") # DONE: these decodings are consistent with the sample
+                    sample[idx_s] = the_sample["sampled_token"] 
             sample = sample.reshape(batch, k)
-            # print(f"\tdecoded: {tokenizer.decode(sample[0])}")
-            # print(f"\tdecode indices: {order_to_pos[n:n+k]}")
-            # print(f"\tnew_sequence: {tokenizer.decode(new_sequence[0])}")
         else:
             # Use transformer model for draft predictions
             with torch.no_grad():
@@ -139,7 +132,6 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         assert pred_probs.shape == (k, vocab_size)
         assert sample.shape == (1, k)
 
-        # TODO: make sure this adds no bugs
         # Slight optimization: skip the last check if we already got to last token
         if (not ngram_model) and (n == seqlen - 1):
             assert k == 1
@@ -159,7 +151,6 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         proposed_sequence = new_sequence.clone()
         assert proposed_sequence.shape == (1, seqlen)
         proposed_sequence[0, order_to_pos[n:n+k]] = sample[0] # only update the ones we've just decoded
-        # proposed_sequence[parallel_sigma == seqlen] = sample[parallel_sigma == seqlen] # only update the ones we've decoded
         # Reordering
         if adaptive_order:
             raise ValueError("not supported rn - see other branch")
@@ -195,7 +186,6 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 # We accept this guess of the token!
                 assert new_sequence[0, idx_in_seq] == mask_token # make sure it's actually masked
                 new_sequence[0, idx_in_seq] = chosen_token
-                # print(f"\tNew Sequence: {tokenizer.decode(new_sequence[0])}")
                 if ngram_model: # update the n-gram model
                     update_context_ngram(context_ngram=context_ngram, new_sequence=new_sequence, idx_in_seq=idx_in_seq, seqlen=seqlen)
             else:
@@ -217,15 +207,6 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
             assert i > n or (i == n == seqlen - 1)
         n = i + 1 # this is the number of tokens we've decoded (since we ZERO index)
         assert torch.sum(new_sequence != mask_token) == n, f"num decoded: {torch.sum(new_sequence != mask_token)}; n: {n}" # num decoded equals n
-        # NOTE: take new token skipped because we always try everything
-    # if ngram_model:
-    #     print("bigrams:") # DONE: this checks out with the generated sample!
-    #     for first_token in context_ngram.bigrams.keys():
-    #         for second_token in context_ngram.bigrams[first_token].keys():
-    #             print(f"\t{tokenizer.decode([first_token, second_token])}: {context_ngram.bigrams[first_token][second_token]}")
-    #     print("unigrams:") # DONE: this also checks out with the generated sample!
-    #     for token in context_ngram.unigrams.keys():
-    #         print(f"\t{tokenizer.decode([token])}: {context_ngram.unigrams[token]}")
     return new_sequence, nfe_count
 
 def update_context_ngram(context_ngram, new_sequence, idx_in_seq, seqlen):
