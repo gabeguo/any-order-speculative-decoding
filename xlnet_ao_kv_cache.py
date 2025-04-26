@@ -49,7 +49,6 @@ class XLNetRelativeAttentionAOKVCache(XLNetRelativeAttention):
             # Column indices are offsets, based on the query indices: this will give us the RPEs corresponding to keys 0->seqlen-1
             col_offsets = seqlen - query_indices.view(1, 1, query_indices.shape[0], 1).expand(desired_shape)
             col_indices = col_offsets + torch.arange(seqlen).view(1, 1, 1, seqlen).expand(desired_shape).to(bd.device)
-            assert col_indices.shape == row_idx.shape
             
             bd = torch.gather(bd, dim=3, index=col_indices)
 
