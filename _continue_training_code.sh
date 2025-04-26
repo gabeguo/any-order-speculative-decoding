@@ -4,8 +4,9 @@
 #SBATCH --partition=m1266
 #SBATCH --account=m1266
 #SBATCH --job-name=code_training
-#
-#SBATCH --time=6-00:00:00
+#SBATCH --constraint=gpu
+#SBATCH --qos=regular
+#SBATCH --time=144:00:00
 #SBATCH --nodes=1                # Single node
 #SBATCH --gpus=a100:4
 #SBATCH --cpus-per-task=8       # CPUs for the job
