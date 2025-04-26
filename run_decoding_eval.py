@@ -14,6 +14,7 @@ from datasets import load_dataset
 from speculative_decoding import speculative_decoding, create_gt_perm_mask
 from finetune_xlnet_distributed import create_pos_to_rank
 from tqdm import tqdm
+from xlnet_ao_kv_cache import XLNetAOKVCache
 
 OFF_THE_SHELF_KEY = "off_the_shelf"
 FINETUNED_KEY = "finetuned"
@@ -91,6 +92,7 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained("xlnet/xlnet-base-cased")
     # Baseline
     baseline_model = XLNetLMHeadModel.from_pretrained("xlnet/xlnet-base-cased")
+    baseline_model.transformer = XLNetAOKVCache.from_pretrained("xlnet/xlnet-base-cased")
     baseline_model = baseline_model.to("cuda")
     baseline_model.eval()
     # Fine-tuned
@@ -100,9 +102,17 @@ def main(args):
             PRETRAINED_MODEL,
             use_safetensors=True,
             revision="nlp") # pull from nlp branch
+        finetuned_model.transformer = XLNetAOKVCache.from_pretrained(
+            PRETRAINED_MODEL,
+            use_safetensors=True,
+            revision="nlp")
     else:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         finetuned_model = XLNetLMHeadModel.from_pretrained(
+            args.finetuned_model_dir,
+            local_files_only=True,
+            use_safetensors=True)
+        finetuned_model.transformer = XLNetAOKVCache.from_pretrained(
             args.finetuned_model_dir,
             local_files_only=True,
             use_safetensors=True)

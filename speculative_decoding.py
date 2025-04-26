@@ -1,6 +1,8 @@
 
 import torch
 from context_ngram import ContextNGram
+from xlnet_ao_kv_cache import XLNetAOKVCache
+import time
 
 # Calculates the permutation mask for the parallel decoding
 def calc_parallel_perm_mask(sigma, step, seqlen, select_conditioning):
@@ -19,6 +21,16 @@ def create_gt_perm_mask(sigma, seqlen, select_conditioning):
     perm_mask[select_conditioning] = 0 # This is a hack if we want the joint. But it's principled if we never need to evaluate the density of the conditioning. Huggingface does this, and it improves their results.
     perm_mask = perm_mask.to(device="cuda")
     return perm_mask
+
+def init_mems(model, prompt_tokens, perm_mask, order_to_pos, start, seqlen):
+    # TODO: I think target mapping doesn't matter
+    the_target_mapping = torch.eye(seqlen).unsqueeze(0).to(device="cuda")
+
+    partial_outputs = model(prompt_tokens, perm_mask=perm_mask, target_mapping=the_target_mapping)
+    mems = [x[order_to_pos[:start]] for x in partial_outputs.mems]
+    print("order_to_pos: ", order_to_pos)
+    print("mems shape: ", mems[0].shape)    
+    return mems
 
 def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_token=6, vocab_size=32000, adaptive_order=False, k=10, print_steps=False, eps=0, T=1, ngram_model=False, no_temp_oracle=False):
     if print_steps:
@@ -49,11 +61,21 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         assert context_ngram.total_tokens == start, f"total tokens: {context_ngram.total_tokens}; start: {start}"
 
     ###
-    # Step 0: Initialize the masking
+    # Step 0: Initialize the masking & ordering
     ###
     sigma = sigma.to(device="cuda")
     select_conditioning = torch.logical_and(sigma.unsqueeze(2) < start, sigma.unsqueeze(1) < start) # These are all the initially visible tokens
     perm_mask = create_gt_perm_mask(sigma=sigma, seqlen=seqlen, select_conditioning=select_conditioning)
+
+    # create order_to_pos
+    assert sigma.shape == (1, seqlen)
+    order_to_pos = torch.argsort(sigma, dim=1).squeeze(0) # sigma[i] = rank of idx (order in which the indices should be decoded): put lowest-ranked idx first. order_to_pos[i] = the ith-ranked idx
+    assert order_to_pos.shape == (seqlen,)
+    assert torch.min(order_to_pos) == 0
+    assert torch.max(order_to_pos) == seqlen - 1
+
+    # TODO: initialize mems
+    mems = init_mems(model=model, prompt_tokens=prompt_tokens, perm_mask=perm_mask, order_to_pos=order_to_pos, start=start, seqlen=seqlen)
 
     # Go Loop!
     n = start
@@ -68,16 +90,10 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         k = min(k, seqlen - n) # number of tokens to decode
         # Get target mappings for next k tokens
         target_mapping = torch.zeros(1, k, seqlen)
-        assert sigma.shape == (1, seqlen)
-        order_to_pos = torch.argsort(sigma, dim=1).squeeze(0) # sigma[i] = rank of idx (order in which the indices should be decoded): put lowest-ranked idx first. order_to_pos[i] = the ith-ranked idx
-        assert order_to_pos.shape == (seqlen,)
-        assert torch.min(order_to_pos) == 0
-        assert torch.max(order_to_pos) == seqlen - 1
-        # print(order_to_pos[n:n+k])
+
         target_mapping = target_mapping.cuda()
         target_mapping[0, torch.arange(k), order_to_pos[n:n+k]] = 1.0 # predict the n-th to n+k-th ranked tokens
         assert torch.sum(target_mapping) == k
-        # assert len(target_mapping[0, torch.arange(k), order_to_pos[n:n+k]]) == k
 
         if ngram_model and order_to_pos[n] >= 1:
             assert context_ngram.total_tokens == n, f"total tokens: {context_ngram.total_tokens}; n: {n}"
@@ -113,13 +129,50 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         else:
             # Use transformer model for draft predictions
             with torch.no_grad():
-                pred_logits = model(new_sequence, perm_mask=parallel_perm_mask.to(device="cuda"), target_mapping=target_mapping)[0] # Output has shape  [target_mapping.size(0), target_mapping.size(1), config.vocab_size]
+                mlen = mems[0].shape[0]
+                print(f"mlen: {mlen}; n: {n}")
+                assert mlen <= n, f"mlen: {mlen}; n: {n}" # we didn't have mem for the tokens we just decoded via speculative decoding
+                mem_indices = order_to_pos[:mlen]
+                query_indices = order_to_pos[mlen:n+k]
+                num_query_tokens = n + k - mlen
+                num_known_tokens = n - mlen
+                assert query_indices.shape == (num_query_tokens,)
+
+                kv_cache_target_mapping = torch.eye(num_query_tokens).unsqueeze(0).to(device="cuda")
+
+                assert not torch.any(new_sequence[:, order_to_pos[mlen:n]] == mask_token), f"new_sequence: {new_sequence}"
+                assert torch.all(new_sequence[:, order_to_pos[n:n+k]] == mask_token), f"new_sequence: {new_sequence}"
+
+                kv_cache_parallel_perm_mask = torch.ones(num_query_tokens, num_query_tokens) # by default, no attention
+                kv_cache_parallel_perm_mask[:num_known_tokens, :num_known_tokens] = torch.arange(num_known_tokens).unsqueeze(1) <= torch.arange(num_known_tokens).unsqueeze(0) # known tokens have causal attention
+                kv_cache_parallel_perm_mask[num_known_tokens:, :num_known_tokens] = 0 # the tokens to be predicted CAN attend to the known tokens, but not themselves
+                kv_cache_parallel_perm_mask = kv_cache_parallel_perm_mask.unsqueeze(0).to(device="cuda")
+
+                kv_pred_start_time = time.time()
+                kv_cache_pred = model(new_sequence[:, query_indices], use_mems=True, mems=mems, target_mapping=kv_cache_target_mapping, perm_mask=kv_cache_parallel_perm_mask, seqlen=seqlen, mem_indices=mem_indices, query_indices=query_indices)
+                pred_logits_kv_cache = kv_cache_pred.logits
+                print(f"kv pred time: {time.time() - kv_pred_start_time}")
+                
+                # # TODO: use these later
+                mems = [x[:n] for x in kv_cache_pred.mems]
+
+                normal_pred_start_time = time.time()
+                predictions = model(new_sequence, perm_mask=parallel_perm_mask.to(device="cuda"), target_mapping=target_mapping) # Output has shape  [target_mapping.size(0), target_mapping.size(1), config.vocab_size]
+                pred_logits = predictions.logits
+                print(f"normal pred time: {time.time() - normal_pred_start_time}")
                 if no_temp_oracle: # only apply temperature scaling to draft tokens after the first one, so we can guarantee that the first one gets accepted by the oracle (which has NO temperature scaling)
                     if k > 1:
                         pred_logits[:, 1:, :] = pred_logits[:, 1:, :] / T
                 else: # oracle and draft use same temperature, so can scale all tokens
                     pred_logits = pred_logits / T # temperature scaling
                 nfe_count += 1
+
+                print("actual pred logits: ", pred_logits.shape, pred_logits)
+                print("pred logits kv cache: ", pred_logits_kv_cache.shape, pred_logits_kv_cache)
+
+                print("actual mems:", predictions.mems[-1][order_to_pos[:n+k]])
+                print("kv cache mems:", kv_cache_pred.mems[-1])
+
             assert pred_logits.shape == (1, k, vocab_size)
             pred_probs = torch.nn.functional.softmax(pred_logits, dim=-1)
             assert pred_probs.shape == pred_logits.shape
@@ -155,7 +208,11 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         if adaptive_order:
             raise ValueError("not supported rn - see other branch")
         with torch.no_grad():
-            gt_logits = model(proposed_sequence, perm_mask=perm_mask, target_mapping=target_mapping)[0]
+            # TODO: implement KV cache here later
+            gt_calc = model(proposed_sequence, perm_mask=perm_mask, target_mapping=target_mapping)
+            gt_logits = gt_calc.logits
+            # TODO: permute mems correctly
+            # mems = [x[:n] for x in gt_calc.mems] # we only know that the first n tokens are correct (since we need to account for n-gram model too, which doesn't necessarily get the first token correct)
             if not no_temp_oracle: # allow temperature scaling for oracle (same temperature as draft)
                 gt_logits = gt_logits / T # temperature scaling
             nfe_count += 1
