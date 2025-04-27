@@ -29,6 +29,7 @@ python -m torch.distributed.launch \
     --items_per_epoch $((120*1000*1000)) --num_epochs 1 \
     --perm_mask_type joint \
     --output_dir $PSCRATCH/xlnet_code \
+    --cache_dir $PSCRATCH/cache_sub \
     --loss_scale_type scale_by_none \
     --eval_steps 5000 \
     --save_steps 2500 \
