@@ -49,6 +49,7 @@ def parse_args():
     parser.add_argument("--skip_ngram", action="store_true")
     parser.add_argument("--is_codegen", action="store_true")
     parser.add_argument("--no_temp_oracle", action="store_true")
+    parser.add_argument("--hf_revision", type=str, default="nlp")
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -100,7 +101,7 @@ def main(args):
         finetuned_model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
-            revision="nlp") # pull from nlp branch
+            revision=args.hf_revision) # pull from nlp branch
     else:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         finetuned_model = XLNetLMHeadModel.from_pretrained(
