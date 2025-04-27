@@ -15,7 +15,8 @@ from transformers import AutoTokenizer, GPT2Tokenizer
 OFF_THE_SHELF_KEY = "off_the_shelf"
 FINETUNED_KEY = "finetuned"
 REGULAR_KEY = "regular_decoding"
-SPECULATIVE_KEY = "speculative_decoding"
+PARALLEL_KEY = "parallel_draft_speculative_decoding"
+NGRAM_KEY = "ngram_draft_speculative_decoding"
 EXECUTION_TIME_KEY = "execution_time"
 NFE_COUNT_KEY = "nfe_count"
 DECODED_SEQUENCES_KEY = "decoded_sequences"
@@ -27,6 +28,7 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--results_dir", type=str, default="/atlas/u/gabeguo/speculative_decoding/2025-02-12_151532")
     parser.add_argument("--skip_off_the_shelf", action="store_true")
+    parser.add_argument("--skip_ngram", action="store_true")
     return parser.parse_args()
 
 def eval_perplexity(args, predictions):
@@ -105,48 +107,51 @@ def process_results(args, results_dict, model_name_keys, decoding_name_keys):
             all_results[model_name][decoding_name] = curr_results
             
         # Statistical tests for PPL
-        assert len(ppl_by_decoding[REGULAR_KEY]) == len(ppl_by_decoding[SPECULATIVE_KEY])
-        t_test_ind = stats.ttest_ind(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
-        t_test_paired = stats.ttest_rel(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
-        wilcoxon_test = stats.wilcoxon(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY], zero_method="zsplit").pvalue
-        mann_whitney_test = stats.mannwhitneyu(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
+        for SPECULATIVE_KEY in decoding_name_keys:
+            if SPECULATIVE_KEY == REGULAR_KEY:
+                continue
+            assert len(ppl_by_decoding[REGULAR_KEY]) == len(ppl_by_decoding[SPECULATIVE_KEY])
+            t_test_ind = stats.ttest_ind(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
+            t_test_paired = stats.ttest_rel(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
+            wilcoxon_test = stats.wilcoxon(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY], zero_method="zsplit").pvalue
+            mann_whitney_test = stats.mannwhitneyu(ppl_by_decoding[REGULAR_KEY], ppl_by_decoding[SPECULATIVE_KEY]).pvalue
 
-        # Statistical tests for entropy
-        entropy_t_test_ind = stats.ttest_ind(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
-        entropy_t_test_paired = stats.ttest_rel(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
-        entropy_wilcoxon_test = stats.wilcoxon(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY], zero_method="zsplit").pvalue
-        entropy_mann_whitney_test = stats.mannwhitneyu(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
+            # Statistical tests for entropy
+            entropy_t_test_ind = stats.ttest_ind(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
+            entropy_t_test_paired = stats.ttest_rel(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
+            entropy_wilcoxon_test = stats.wilcoxon(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY], zero_method="zsplit").pvalue
+            entropy_mann_whitney_test = stats.mannwhitneyu(entropy_by_decoding[REGULAR_KEY], entropy_by_decoding[SPECULATIVE_KEY]).pvalue
 
-        all_results[model_name][STATISTICAL_TEST_KEY] = {
-            "ppl_t_test_ind": t_test_ind,
-            "ppl_t_test_paired": t_test_paired,
-            "ppl_wilcoxon_test": wilcoxon_test,
-            "ppl_mann_whitney_test": mann_whitney_test,
-            "entropy_t_test_ind": entropy_t_test_ind,
-            "entropy_t_test_paired": entropy_t_test_paired,
-            "entropy_wilcoxon_test": entropy_wilcoxon_test,
-            "entropy_mann_whitney_test": entropy_mann_whitney_test
-        }
-        
-        # Plot PPL histogram
-        title = f"{model_name} PPL Histogram\np = {t_test_paired:.4f}"
-        bins = np.linspace(min(min(ppl_by_decoding[REGULAR_KEY]), min(ppl_by_decoding[SPECULATIVE_KEY])), max(max(ppl_by_decoding[REGULAR_KEY]), max(ppl_by_decoding[SPECULATIVE_KEY])), 20)
-        plt.hist(ppl_by_decoding[REGULAR_KEY], label=REGULAR_KEY, histtype='step', bins=bins)
-        plt.hist(ppl_by_decoding[SPECULATIVE_KEY], label=SPECULATIVE_KEY, histtype='step', bins=bins)
-        plt.title(title)
-        plt.legend()
-        plt.savefig(os.path.join(args.results_dir, f"{model_name}_ppl_hist.png"))
-        plt.close()
+            all_results[model_name][f"{SPECULATIVE_KEY}_{STATISTICAL_TEST_KEY}"] = {
+                "ppl_t_test_ind": t_test_ind,
+                "ppl_t_test_paired": t_test_paired,
+                "ppl_wilcoxon_test": wilcoxon_test,
+                "ppl_mann_whitney_test": mann_whitney_test,
+                "entropy_t_test_ind": entropy_t_test_ind,
+                "entropy_t_test_paired": entropy_t_test_paired,
+                "entropy_wilcoxon_test": entropy_wilcoxon_test,
+                "entropy_mann_whitney_test": entropy_mann_whitney_test
+            }
+            
+            # Plot PPL histogram
+            title = f"{model_name} PPL Histogram\np = {t_test_paired:.4f}"
+            bins = np.linspace(min(min(ppl_by_decoding[REGULAR_KEY]), min(ppl_by_decoding[SPECULATIVE_KEY])), max(max(ppl_by_decoding[REGULAR_KEY]), max(ppl_by_decoding[SPECULATIVE_KEY])), 20)
+            plt.hist(ppl_by_decoding[REGULAR_KEY], label=REGULAR_KEY, histtype='step', bins=bins)
+            plt.hist(ppl_by_decoding[SPECULATIVE_KEY], label=SPECULATIVE_KEY, histtype='step', bins=bins)
+            plt.title(title)
+            plt.legend()
+            plt.savefig(os.path.join(args.results_dir, f"{model_name}_{SPECULATIVE_KEY}_ppl_hist.png"))
+            plt.close()
 
-        # Plot entropy histogram
-        title = f"{model_name} Entropy Histogram\np = {entropy_t_test_paired:.4f}"
-        bins = np.linspace(min(min(entropy_by_decoding[REGULAR_KEY]), min(entropy_by_decoding[SPECULATIVE_KEY])), max(max(entropy_by_decoding[REGULAR_KEY]), max(entropy_by_decoding[SPECULATIVE_KEY])), 20)
-        plt.hist(entropy_by_decoding[REGULAR_KEY], label=REGULAR_KEY, histtype='step', bins=bins)
-        plt.hist(entropy_by_decoding[SPECULATIVE_KEY], label=SPECULATIVE_KEY, histtype='step', bins=bins)
-        plt.title(title)
-        plt.legend()
-        plt.savefig(os.path.join(args.results_dir, f"{model_name}_entropy_hist.png"))
-        plt.close()
+            # Plot entropy histogram
+            title = f"{model_name} Entropy Histogram\np = {entropy_t_test_paired:.4f}"
+            bins = np.linspace(min(min(entropy_by_decoding[REGULAR_KEY]), min(entropy_by_decoding[SPECULATIVE_KEY])), max(max(entropy_by_decoding[REGULAR_KEY]), max(entropy_by_decoding[SPECULATIVE_KEY])), 20)
+            plt.hist(entropy_by_decoding[REGULAR_KEY], label=REGULAR_KEY, histtype='step', bins=bins)
+            plt.hist(entropy_by_decoding[SPECULATIVE_KEY], label=SPECULATIVE_KEY, histtype='step', bins=bins)
+            plt.title(title)
+            plt.legend()
+            plt.savefig(os.path.join(args.results_dir, f"{model_name}_{SPECULATIVE_KEY}_entropy_hist.png"))
+            plt.close()
         
     return all_results
 
@@ -176,10 +181,14 @@ if __name__ == "__main__":
         model_name_keys = [FINETUNED_KEY]
     else: # off-the-shelf and finetuned model
         model_name_keys = [OFF_THE_SHELF_KEY, FINETUNED_KEY]
+    if args.skip_ngram:
+        decoding_name_keys = [REGULAR_KEY, PARALLEL_KEY]
+    else:
+        decoding_name_keys = [REGULAR_KEY, PARALLEL_KEY, NGRAM_KEY]
     all_results = process_results(args,
         results_dict=results_dict,
         model_name_keys=model_name_keys,
-        decoding_name_keys=[REGULAR_KEY, SPECULATIVE_KEY]
+        decoding_name_keys=decoding_name_keys
     )
 
     output_filename = os.path.join(args.results_dir, "ppl_results.json")
