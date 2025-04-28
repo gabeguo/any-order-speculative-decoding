@@ -25,7 +25,7 @@ dataset="bigcode/starcoderdata"
 
 python -m torch.distributed.launch \
     --nproc_per_node=4 finetune_xlnet_distributed.py \
-    --batch_size 24 --accumulation_steps 2 \
+    --batch_size 32 --accumulation_steps 2 \
     --learning_rate 1e-5 \
     --warmup_steps 2500 --masking_warmup_steps 2500 \
     --start_masking_rate 0.01 --final_min_masking_rate 0.05 --final_max_masking_rate 0.25 \
