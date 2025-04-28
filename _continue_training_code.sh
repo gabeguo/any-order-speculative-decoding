@@ -24,7 +24,7 @@ echo $HF_HOME
 dataset="bigcode/starcoderdata"
 
 python -m torch.distributed.launch \
-    --nproc_per_node=1 finetune_xlnet_distributed.py \
+    --nproc_per_node=4 finetune_xlnet_distributed.py \
     --batch_size 24 --accumulation_steps 2 \
     --learning_rate 1e-5 \
     --warmup_steps 2500 --masking_warmup_steps 2500 \
