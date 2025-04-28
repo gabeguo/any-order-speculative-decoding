@@ -18,7 +18,8 @@ from tqdm import tqdm
 OFF_THE_SHELF_KEY = "off_the_shelf"
 FINETUNED_KEY = "finetuned"
 REGULAR_KEY = "regular_decoding"
-SPECULATIVE_KEY = "speculative_decoding"
+PARALLEL_KEY = "parallel_draft_speculative_decoding"
+NGRAM_KEY = "ngram_draft_speculative_decoding"
 EXECUTION_TIME_KEY = "execution_time"
 NFE_COUNT_KEY = "nfe_count"
 DECODED_SEQUENCES_KEY = "decoded_sequences"
@@ -38,7 +39,6 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--print_steps", action="store_true")
     parser.add_argument("--finetuned_model_dir", type=str, default=PRETRAINED_MODEL)
-    parser.add_argument("--ngram_model", action="store_true")
     parser.add_argument("--start_percentage", type=float, default=0.1)
     parser.add_argument("--k", type=int, default=15)
     parser.add_argument("--num_trials", type=int, default=10)
@@ -46,8 +46,10 @@ def parse_args():
     parser.add_argument("--eps", type=float, default=0)
     parser.add_argument("--T", type=float, default=1)
     parser.add_argument("--skip_off_the_shelf", action="store_true")
+    parser.add_argument("--skip_ngram", action="store_true")
     parser.add_argument("--is_codegen", action="store_true")
     parser.add_argument("--no_temp_oracle", action="store_true")
+    parser.add_argument("--hf_revision", type=str, default="nlp")
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -99,7 +101,7 @@ def main(args):
         finetuned_model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
-            revision="nlp") # pull from nlp branch
+            revision=args.hf_revision) # pull from nlp branch
     else:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         finetuned_model = XLNetLMHeadModel.from_pretrained(
@@ -118,7 +120,7 @@ def main(args):
     results_dict = dict()
     for model_name in [OFF_THE_SHELF_KEY, FINETUNED_KEY]:
         results_dict[model_name] = dict()
-        for decoding_name in [REGULAR_KEY, SPECULATIVE_KEY]:
+        for decoding_name in [REGULAR_KEY, PARALLEL_KEY, NGRAM_KEY]:
             results_dict[model_name][decoding_name] = {
                 EXECUTION_TIME_KEY: [],
                 NFE_COUNT_KEY: [],
@@ -157,37 +159,43 @@ def main(args):
 
             print("\n###\n###", model_name, "###\n###\n")
 
-            print("\n### Speculative Decoding ###")
-            start_time = time.time()
-            # Speculative decoding
-            speculated_sequence, speculated_nfe_count = speculative_decoding(
-                model=model, 
-                tokenizer=tokenizer,
-                prompt_tokens=prompt_tokens.clone(),
-                sigma=sigma, 
-                start=start,
-                k=args.k,
-                print_steps=args.print_steps,
-                eps=args.eps,
-                T=args.T,
-                ngram_model=args.ngram_model,
-                no_temp_oracle=args.no_temp_oracle
-            )
-            end_time = time.time()
-            speculative_decoding_time = end_time - start_time
-            print(f"Execution time of speculative decoding: {speculative_decoding_time:.3f} seconds")
-            print(f"Number of NFEs: {speculated_nfe_count}")
-            assert torch.all(speculated_sequence != 6)
-            speculated_sequence = tokenizer.decode(speculated_sequence[0, :])
-            if args.is_codegen:
-                for k, v in CODE_SPECIAL_CHARACTER_MAPPINGS.items():
-                    speculated_sequence = speculated_sequence.replace(k, v)
-            assert "<mask>" not in speculated_sequence
-            print("speculated sequence: ", speculated_sequence)
+            if args.skip_ngram:
+                the_decoding_strategies = [(PARALLEL_KEY, False)]
+            else:
+                the_decoding_strategies = [(PARALLEL_KEY, False), (NGRAM_KEY, True)]
+            for decoding_strat in the_decoding_strategies:
+                decoding_name, use_ngram_model = decoding_strat
+                print("\n###", decoding_name, "###")
+                start_time = time.time()
+                # Speculative decoding
+                speculated_sequence, speculated_nfe_count = speculative_decoding(
+                    model=model, 
+                    tokenizer=tokenizer,
+                    prompt_tokens=prompt_tokens.clone(),
+                    sigma=sigma, 
+                    start=start,
+                    k=args.k,
+                    print_steps=args.print_steps,
+                    eps=args.eps,
+                    T=args.T,
+                    ngram_model=use_ngram_model,
+                    no_temp_oracle=args.no_temp_oracle
+                )
+                end_time = time.time()
+                speculative_decoding_time = end_time - start_time
+                print(f"Execution time of speculative decoding: {speculative_decoding_time:.3f} seconds")
+                print(f"Number of NFEs: {speculated_nfe_count}")
+                assert torch.all(speculated_sequence != 6)
+                speculated_sequence = tokenizer.decode(speculated_sequence[0, :])
+                if args.is_codegen:
+                    for k, v in CODE_SPECIAL_CHARACTER_MAPPINGS.items():
+                        speculated_sequence = speculated_sequence.replace(k, v)
+                assert "<mask>" not in speculated_sequence
+                print("speculated sequence: ", speculated_sequence)
 
-            results_dict[model_name][SPECULATIVE_KEY][EXECUTION_TIME_KEY].append(speculative_decoding_time)
-            results_dict[model_name][SPECULATIVE_KEY][NFE_COUNT_KEY].append(speculated_nfe_count)
-            results_dict[model_name][SPECULATIVE_KEY][DECODED_SEQUENCES_KEY].append(speculated_sequence)
+                results_dict[model_name][decoding_name][EXECUTION_TIME_KEY].append(speculative_decoding_time)
+                results_dict[model_name][decoding_name][NFE_COUNT_KEY].append(speculated_nfe_count)
+                results_dict[model_name][decoding_name][DECODED_SEQUENCES_KEY].append(speculated_sequence)
 
             ###
             # Principled way to generate. Unfortunately, Huggingface implemented their generation in an unprincipled way. At the moment, this does not support KV caching.
