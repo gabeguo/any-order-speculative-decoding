@@ -50,6 +50,7 @@ def parse_args():
     parser.add_argument("--is_codegen", action="store_true")
     parser.add_argument("--no_temp_oracle", action="store_true")
     parser.add_argument("--hf_revision", type=str, default="nlp")
+    parser.add_argument("--use_openwebtext", action="store_true")
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -113,8 +114,12 @@ def main(args):
 
     print(tokenizer.decode([6], skip_special_tokens=False))
 
-    ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", streaming=True)
-    test_ds = ds["test"]
+    if args.use_openwebtext:
+        dataset = load_dataset("openwebtext", streaming=True)
+        test_ds = dataset["train"]
+    else:
+        ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", streaming=True)
+        test_ds = ds["test"]
     packed_ds = PackedDataset(test_ds, tokenizer, max_length=512, is_code=False)
 
     results_dict = dict()
