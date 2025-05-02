@@ -164,6 +164,7 @@ def parse_args():
     parser.add_argument("--max_items", type=int, default=50)
     parser.add_argument("--num_trials", type=int, default=1)
     parser.add_argument("--short_prompt", action="store_true")
+    parser.add_argument("--hf_revision", type=str, default="nlp")
     return parser.parse_args()
 
 def main(args):
@@ -172,7 +173,7 @@ def main(args):
         model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
-            revision="nlp") # pull from nlp branch
+            revision=args.hf_revision) # pull from nlp branch
     elif args.finetuned_model_dir is not None:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         model = XLNetLMHeadModel.from_pretrained(
