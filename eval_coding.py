@@ -53,12 +53,13 @@ def parse_args():
     parser.add_argument("--finetuned_model_dir", type=str, default=PRETRAINED_MODEL)
     parser.add_argument("--output_dir", type=str, default="/atlas/u/gabeguo/humaneval_infill_results")
     parser.add_argument("--max_tasks", type=int, default=2000)
+    parser.add_argument("--num_samples_per_task", type=int, default=1)
     return parser.parse_args()
 
 def main(args):
     problems = read_problems(benchmark_name="single-line")
 
-    num_samples_per_task = 1
+    num_samples_per_task = args.num_samples_per_task
 
     if args.finetuned_model_dir == PRETRAINED_MODEL:
         print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
