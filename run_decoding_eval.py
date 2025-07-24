@@ -51,6 +51,7 @@ def parse_args():
     parser.add_argument("--no_temp_oracle", action="store_true")
     parser.add_argument("--hf_revision", type=str, default="nlp")
     parser.add_argument("--use_openwebtext", action="store_true")
+    parser.add_argument("--max_length", type=int, default=512)
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -120,7 +121,7 @@ def main(args):
     else:
         ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", streaming=True)
         test_ds = ds["test"]
-    packed_ds = PackedDataset(test_ds, tokenizer, max_length=512, is_code=False)
+    packed_ds = PackedDataset(test_ds, tokenizer, max_length=args.max_length, is_code=False)
 
     results_dict = dict()
     for model_name in [OFF_THE_SHELF_KEY, FINETUNED_KEY]:
