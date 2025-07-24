@@ -52,6 +52,7 @@ def parse_args():
     parser.add_argument("--hf_revision", type=str, default="nlp")
     parser.add_argument("--use_openwebtext", action="store_true")
     parser.add_argument("--max_length", type=int, default=512)
+    parser.add_argument("--left_to_right", action="store_true")
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -144,7 +145,10 @@ def main(args):
         start = int(input_ids.shape[1] * args.start_percentage) + 1
         # For each trial, give a different permutation
         # TODO: slightly modify this so that we don't break left-to-right ordering after the prompt
-        sigma = create_pos_to_rank(input_ids.shape[-1], curr_masking_rate=1-args.start_percentage, fixed_visible_ratio=True).unsqueeze(0).to(device="cuda")
+        if args.left_to_right: # want to do left-to-right AR decoding
+            sigma = torch.arange(input_ids.shape[-1]).unsqueeze(0).to(device="cuda")
+        else: # any-subset decoding
+            sigma = create_pos_to_rank(input_ids.shape[-1], curr_masking_rate=1-args.start_percentage, fixed_visible_ratio=True).unsqueeze(0).to(device="cuda")
         prompt_tokens = input_ids.clone() # clone each time, so we don't overwrite
         prompt_tokens[sigma >= start] = 6
         masked_prompt_str = tokenizer.decode(prompt_tokens[0, :]).replace("<mask>", "_")
