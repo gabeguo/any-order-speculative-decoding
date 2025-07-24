@@ -13,7 +13,7 @@
 # TODO: change output_dir and --finetuned_model_dir
 for k in 2 3 5 10 15 20; do
     for max_length in 128 256 512 1024; do
-        output_dir="/atlas/u/gabeguo/neurips_2025/speculative_decoding/k_${k}_max_length_${max_length}"
+        output_dir="/atlas/u/gabeguo/neurips_2025/speculative_decoding/ablations/k_${k}_max_length_${max_length}"
 
         python -O run_decoding_eval.py \
             --finetuned_model_dir therealgabeguo/ASARM \
