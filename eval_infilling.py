@@ -66,7 +66,7 @@ def create_sigma_for_loop(input_ids, mask_token_id=6):
 
 def eval_hellaswag(model, tokenizer, args):
     from datasets import load_dataset
-    dataset = load_dataset("hellaswag", streaming=True)["test"]
+    dataset = load_dataset("Rowan/hellaswag", streaming=True)["validation"]
     total_correct = 0
     total_cnt = 0
     for item_idx, item in enumerate(tqdm(dataset)):
@@ -78,7 +78,7 @@ def eval_hellaswag(model, tokenizer, args):
         highest_ending = None
         for option_idx, ending in enumerate(item["endings"]):
             the_string = context + " " + ending
-            input_ids = tokenizer.encode(the_string, add_special_tokens=False)
+            input_ids = torch.tensor(tokenizer.encode(the_string, add_special_tokens=False))
 
             sigma, num_visible = create_sigma(input_ids)
             assert sigma.shape == (input_ids.shape[-1],)
@@ -90,7 +90,7 @@ def eval_hellaswag(model, tokenizer, args):
             logits = outputs.logits
             
             # Calculate log probabilities
-            log_probs = F.log_softmax(logits, dim=-1)
+            log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             
             assert log_probs.shape == (input_ids.shape[0], input_ids.shape[1], log_probs.shape[-1])
             # Get the predicted token probabilities by gathering along sequence dimension
@@ -122,6 +122,7 @@ def eval_hellaswag(model, tokenizer, args):
     return
 
 def eval_lambada(model, tokenizer, args):
+    problems = []
     from datasets import load_dataset
     dataset = load_dataset("lambada", streaming=True)["test"]
     for item in dataset:
