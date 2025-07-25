@@ -6,7 +6,7 @@ import csv, json
 import evaluate
 import torch
 from run_decoding_eval import regular_decoding
-from speculative_decoding import speculative_decoding
+from speculative_decoding import speculative_decoding, create_gt_perm_mask
 import argparse
 from transformers import AutoTokenizer, XLNetLMHeadModel
 from datetime import datetime
@@ -77,17 +77,31 @@ def eval_hellaswag(model, tokenizer, args):
         highest_log_prob = -float("inf")
         highest_ending = None
         for option_idx, ending in enumerate(item["endings"]):
-            the_string = context + " " + ending
-            input_ids = torch.tensor(tokenizer.encode(the_string, add_special_tokens=False))
+            context_tokens = tokenizer.encode(context, add_special_tokens=False)
+            ending_tokens = tokenizer.encode(ending, add_special_tokens=False)
+            input_ids = torch.tensor(context_tokens + ending_tokens)
 
             sigma, num_visible = create_sigma(input_ids)
             assert sigma.shape == (input_ids.shape[-1],)
             sigma = sigma.unsqueeze(0).to(device="cuda")
+            assert sigma.shape == (1, num_visible)
+
+            seqlen = num_visible
+            start = len(context_tokens)
+            select_conditioning = torch.logical_and(sigma.unsqueeze(2) < start, sigma.unsqueeze(1) < start) # These are all the initially visible tokens
+            perm_mask = create_gt_perm_mask(sigma=sigma, seqlen=seqlen, select_conditioning=select_conditioning)
+            perm_mask = perm_mask.to(device="cuda")
+
+            target_mapping = torch.eye(seqlen, device="cuda")
+            target_mapping = target_mapping.unsqueeze(0)
+            assert target_mapping.shape == (1, seqlen, seqlen)
+            assert torch.sum(target_mapping) == seqlen
+
             input_ids = input_ids.unsqueeze(0).to(device="cuda")
+            assert input_ids.shape == (1, seqlen)
 
             # Get logits from model
-            outputs = model(input_ids=input_ids, sigma=sigma)
-            logits = outputs.logits
+            logits = model(input_ids=input_ids, perm_mask=perm_mask, target_mapping=target_mapping)[0]
             
             # Calculate log probabilities
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
