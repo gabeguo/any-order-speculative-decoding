@@ -212,6 +212,7 @@ def main(args):
             print(f"KV time: {kv_time:.3f} seconds")
             print(f"Regular time: {regular_time:.3f} seconds")
 
+            """
             ###
             # Principled way to generate. Unfortunately, Huggingface implemented their generation in an unprincipled way. At the moment, this does not support KV caching.
             ###
@@ -247,6 +248,7 @@ def main(args):
             results_dict[model_name][REGULAR_KEY][EXECUTION_TIME_KEY].append(regular_time)
             results_dict[model_name][REGULAR_KEY][NFE_COUNT_KEY].append(regular_nfe_count)
             results_dict[model_name][REGULAR_KEY][DECODED_SEQUENCES_KEY].append(regular_sequence)
+            """
     return results_dict
 
 def create_output_path(args):
@@ -266,6 +268,14 @@ def create_output_path(args):
 if __name__ == "__main__":
     args = parse_args()
     results_dict = main(args)
+    results_dict["kv_cache_time_stats"] = {
+        "mean": np.mean(results_dict[FINETUNED_KEY][SPECULATIVE_KEY][KV_TIME_KEY]),
+        "std": np.std(results_dict[FINETUNED_KEY][SPECULATIVE_KEY][KV_TIME_KEY])
+    }
+    results_dict["no_cache_time_stats"] = {
+        "mean": np.mean(results_dict[FINETUNED_KEY][SPECULATIVE_KEY][REGULAR_TIME_KEY]),
+        "std": np.std(results_dict[FINETUNED_KEY][SPECULATIVE_KEY][REGULAR_TIME_KEY])
+    }
     output_path = create_output_path(args)
     results_output_path = os.path.join(output_path, "results.json")
     args_output_path = os.path.join(output_path, "args.json")

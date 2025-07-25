@@ -203,7 +203,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
             assert new_sequence[0, order_to_pos[-1]] != mask_token
             assert torch.sum(new_sequence == mask_token) == 0, f"num_mask_left: {torch.sum(new_sequence == mask_token)}"
             assert torch.all(new_sequence != mask_token), f"new_sequence: {new_sequence}"
-            return new_sequence, nfe_count
+            return new_sequence, nfe_count, kv_time, regular_time
         
         ###
         # Step 2: Compute GT probs of the generated sequence
