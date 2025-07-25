@@ -21,7 +21,7 @@ def create_gt_perm_mask(sigma, seqlen, select_conditioning):
     return perm_mask
 
 # TODO: adaptive order
-def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_token=6, vocab_size=32000, adaptive_order=False, k=10, print_steps=False, eps=0, T=1, ngram_model=False, no_temp_oracle=False):
+def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_token=6, vocab_size=32000, adaptive_order=False, k=10, print_steps=False, eps=0, T=1, ngram_model=False, no_temp_oracle=False, r_atol=0):
     if print_steps:
         if ngram_model:
             print("Using N-gram model for draft predictions")
@@ -190,7 +190,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 assert torch.allclose(gt_probs[sample_order], pred_probs[sample_order], atol=1e-5), f"gt_probs: {gt_probs[sample_order]}, pred_probs: {pred_probs[sample_order]}"
             # Accept .. or reject
             if r < min(1, 
-                gt_probs[sample_order, chosen_token] / pred_probs[sample_order, chosen_token]
+                gt_probs[sample_order, chosen_token] / pred_probs[sample_order, chosen_token] + r_atol
             ):
                 # We accept this guess of the token!
                 assert new_sequence[0, idx_in_seq] == mask_token # make sure it's actually masked

@@ -53,6 +53,7 @@ def parse_args():
     parser.add_argument("--use_openwebtext", action="store_true")
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--left_to_right", action="store_true")
+    parser.add_argument("--r_atol", type=float, default=0)
     return parser.parse_args()
 
 # NOTE: we edit new_sequence in-place! (Unlike speculative decoding)
@@ -189,7 +190,8 @@ def main(args):
                     eps=args.eps,
                     T=args.T,
                     ngram_model=use_ngram_model,
-                    no_temp_oracle=args.no_temp_oracle
+                    no_temp_oracle=args.no_temp_oracle,
+                    r_atol=args.r_atol
                 )
                 end_time = time.time()
                 speculative_decoding_time = end_time - start_time
