@@ -3,6 +3,7 @@ import torch
 from context_ngram import ContextNGram
 from xlnet_ao_kv_cache import XLNetAOKVCache
 import time
+import numpy as np
 
 # Calculates the permutation mask for the parallel decoding
 def calc_parallel_perm_mask(sigma, step, seqlen, select_conditioning):
@@ -39,8 +40,8 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         else:
             print("Using same model for draft and GT predictions")
     nfe_count = 0
-    kv_time = 0
-    regular_time = 0
+    kv_time = list()
+    regular_time = list()
 
     model = model.cuda()
     batch = prompt_tokens.shape[0]
@@ -155,7 +156,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 pred_logits_kv_cache = kv_cache_pred.logits
                 kv_time_increment = time.time() - kv_pred_start_time
                 print(f"KV time increment: {kv_time_increment:.3f} seconds")
-                kv_time += kv_time_increment
+                kv_time.append(kv_time_increment)
                 
                 # # TODO: use these later
                 mems = [x[:n] for x in kv_cache_pred.mems]
@@ -165,7 +166,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 pred_logits = predictions.logits
                 regular_time_increment = time.time() - normal_pred_start_time
                 print(f"Regular time increment: {regular_time_increment:.3f} seconds")
-                regular_time += regular_time_increment
+                regular_time.append(regular_time_increment)
                 if no_temp_oracle: # only apply temperature scaling to draft tokens after the first one, so we can guarantee that the first one gets accepted by the oracle (which has NO temperature scaling)
                     if k > 1:
                         pred_logits[:, 1:, :] = pred_logits[:, 1:, :] / T
@@ -203,7 +204,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
             assert new_sequence[0, order_to_pos[-1]] != mask_token
             assert torch.sum(new_sequence == mask_token) == 0, f"num_mask_left: {torch.sum(new_sequence == mask_token)}"
             assert torch.all(new_sequence != mask_token), f"new_sequence: {new_sequence}"
-            return new_sequence, nfe_count, kv_time, regular_time
+            return new_sequence, nfe_count, np.mean(kv_time), np.mean(regular_time)
         
         ###
         # Step 2: Compute GT probs of the generated sequence
@@ -271,7 +272,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
             assert i > n or (i == n == seqlen - 1)
         n = i + 1 # this is the number of tokens we've decoded (since we ZERO index)
         assert torch.sum(new_sequence != mask_token) == n, f"num decoded: {torch.sum(new_sequence != mask_token)}; n: {n}" # num decoded equals n
-    return new_sequence, nfe_count, kv_time, regular_time
+    return new_sequence, nfe_count, np.mean(kv_time), np.mean(regular_time)
 
 def update_context_ngram(context_ngram, new_sequence, idx_in_seq, seqlen):
     if idx_in_seq > 0: # add the bigram that ends here
