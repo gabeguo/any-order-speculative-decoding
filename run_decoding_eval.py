@@ -23,6 +23,8 @@ SPECULATIVE_KEY = "speculative_decoding"
 EXECUTION_TIME_KEY = "execution_time"
 NFE_COUNT_KEY = "nfe_count"
 DECODED_SEQUENCES_KEY = "decoded_sequences"
+KV_TIME_KEY = "kv_time"
+REGULAR_TIME_KEY = "regular_time"
 
 CODE_SPECIAL_CHARACTER_MAPPINGS = {
     "<cls>": "\n",
@@ -89,12 +91,15 @@ def regular_decoding(sigma, start, input_ids, new_sequence, model, tokenizer, T=
 
 def main(args):
     print(f"T: {args.T}")
-    tokenizer = AutoTokenizer.from_pretrained("xlnet/xlnet-base-cased")
+    tokenizer = AutoTokenizer.from_pretrained("xlnet/xlnet-large-cased")
     # Baseline
-    baseline_model = XLNetLMHeadModel.from_pretrained("xlnet/xlnet-base-cased")
-    baseline_model.transformer = XLNetAOKVCache.from_pretrained("xlnet/xlnet-base-cased")
+    baseline_model = XLNetLMHeadModel.from_pretrained("xlnet/xlnet-large-cased")
+    baseline_model.transformer = XLNetAOKVCache.from_pretrained("xlnet/xlnet-large-cased")
+
     baseline_model = baseline_model.to("cuda")
     baseline_model.eval()
+    finetuned_model = baseline_model
+    """
     # Fine-tuned
     if args.finetuned_model_dir == PRETRAINED_MODEL:
         print(f"Loading pretrained model from the hub: {PRETRAINED_MODEL}")
@@ -118,12 +123,12 @@ def main(args):
             use_safetensors=True)
     finetuned_model = finetuned_model.to("cuda")
     finetuned_model.eval()
-
+    """
     print(tokenizer.decode([6], skip_special_tokens=False))
 
     ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", streaming=True)
     test_ds = ds["test"]
-    packed_ds = PackedDataset(test_ds, tokenizer, max_length=512, is_code=False)
+    packed_ds = PackedDataset(test_ds, tokenizer, max_length=1024, is_code=False)
 
     results_dict = dict()
     for model_name in [OFF_THE_SHELF_KEY, FINETUNED_KEY]:
@@ -132,7 +137,9 @@ def main(args):
             results_dict[model_name][decoding_name] = {
                 EXECUTION_TIME_KEY: [],
                 NFE_COUNT_KEY: [],
-                DECODED_SEQUENCES_KEY: []
+                DECODED_SEQUENCES_KEY: [],
+                KV_TIME_KEY: [],
+                REGULAR_TIME_KEY: []
             }
     # Save prompt
     results_dict["prompt"] = list()
@@ -170,7 +177,7 @@ def main(args):
             print("\n### Speculative Decoding ###")
             start_time = time.time()
             # Speculative decoding
-            speculated_sequence, speculated_nfe_count = speculative_decoding(
+            speculated_sequence, speculated_nfe_count, kv_time, regular_time = speculative_decoding(
                 model=model, 
                 tokenizer=tokenizer,
                 prompt_tokens=prompt_tokens.clone(),
@@ -198,6 +205,12 @@ def main(args):
             results_dict[model_name][SPECULATIVE_KEY][EXECUTION_TIME_KEY].append(speculative_decoding_time)
             results_dict[model_name][SPECULATIVE_KEY][NFE_COUNT_KEY].append(speculated_nfe_count)
             results_dict[model_name][SPECULATIVE_KEY][DECODED_SEQUENCES_KEY].append(speculated_sequence)
+
+            results_dict[model_name][SPECULATIVE_KEY][KV_TIME_KEY].append(kv_time)
+            results_dict[model_name][SPECULATIVE_KEY][REGULAR_TIME_KEY].append(regular_time)
+
+            print(f"KV time: {kv_time:.3f} seconds")
+            print(f"Regular time: {regular_time:.3f} seconds")
 
             ###
             # Principled way to generate. Unfortunately, Huggingface implemented their generation in an unprincipled way. At the moment, this does not support KV caching.

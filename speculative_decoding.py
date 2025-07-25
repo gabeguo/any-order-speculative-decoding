@@ -39,6 +39,8 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
         else:
             print("Using same model for draft and GT predictions")
     nfe_count = 0
+    kv_time = 0
+    regular_time = 0
 
     model = model.cuda()
     batch = prompt_tokens.shape[0]
@@ -151,7 +153,9 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 kv_pred_start_time = time.time()
                 kv_cache_pred = model(new_sequence[:, query_indices], use_mems=True, mems=mems, target_mapping=kv_cache_target_mapping, perm_mask=kv_cache_parallel_perm_mask, seqlen=seqlen, mem_indices=mem_indices, query_indices=query_indices)
                 pred_logits_kv_cache = kv_cache_pred.logits
-                print(f"kv pred time: {time.time() - kv_pred_start_time}")
+                kv_time_increment = time.time() - kv_pred_start_time
+                print(f"KV time increment: {kv_time_increment:.3f} seconds")
+                kv_time += kv_time_increment
                 
                 # # TODO: use these later
                 mems = [x[:n] for x in kv_cache_pred.mems]
@@ -159,7 +163,9 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                 normal_pred_start_time = time.time()
                 predictions = model(new_sequence, perm_mask=parallel_perm_mask.to(device="cuda"), target_mapping=target_mapping) # Output has shape  [target_mapping.size(0), target_mapping.size(1), config.vocab_size]
                 pred_logits = predictions.logits
-                print(f"normal pred time: {time.time() - normal_pred_start_time}")
+                regular_time_increment = time.time() - normal_pred_start_time
+                print(f"Regular time increment: {regular_time_increment:.3f} seconds")
+                regular_time += regular_time_increment
                 if no_temp_oracle: # only apply temperature scaling to draft tokens after the first one, so we can guarantee that the first one gets accepted by the oracle (which has NO temperature scaling)
                     if k > 1:
                         pred_logits[:, 1:, :] = pred_logits[:, 1:, :] / T
@@ -167,11 +173,12 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
                     pred_logits = pred_logits / T # temperature scaling
                 nfe_count += 1
 
-                print("actual pred logits: ", pred_logits.shape, pred_logits)
-                print("pred logits kv cache: ", pred_logits_kv_cache.shape, pred_logits_kv_cache)
+                # print("actual pred logits: ", pred_logits.shape, pred_logits)
+                # print("pred logits kv cache: ", pred_logits_kv_cache.shape, pred_logits_kv_cache)
 
-                print("actual mems:", predictions.mems[-1][order_to_pos[:n+k]])
-                print("kv cache mems:", kv_cache_pred.mems[-1])
+                # print("actual mems:", predictions.mems[-1][order_to_pos[:n+k]].shape)
+                # print("kv cache mems:", kv_cache_pred.mems[-1].shape)
+                assert torch.allclose(predictions.mems[-1][order_to_pos[:n+k]], kv_cache_pred.mems[-1], atol=1e-4)
 
             assert pred_logits.shape == (1, k, vocab_size)
             pred_probs = torch.nn.functional.softmax(pred_logits, dim=-1)
@@ -264,7 +271,7 @@ def speculative_decoding(model, tokenizer, prompt_tokens, sigma, start, mask_tok
             assert i > n or (i == n == seqlen - 1)
         n = i + 1 # this is the number of tokens we've decoded (since we ZERO index)
         assert torch.sum(new_sequence != mask_token) == n, f"num decoded: {torch.sum(new_sequence != mask_token)}; n: {n}" # num decoded equals n
-    return new_sequence, nfe_count
+    return new_sequence, nfe_count, kv_time, regular_time
 
 def update_context_ngram(context_ngram, new_sequence, idx_in_seq, seqlen):
     if idx_in_seq > 0: # add the bigram that ends here
