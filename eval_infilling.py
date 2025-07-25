@@ -76,6 +76,7 @@ def eval_hellaswag(model, tokenizer, args):
         context = item["ctx"]
         highest_log_prob = -float("inf")
         highest_ending = None
+        print(f"context: {context}")
         for option_idx, ending in enumerate(item["endings"]):
             context_tokens = tokenizer.encode(context, add_special_tokens=False)
             ending_tokens = tokenizer.encode(ending, add_special_tokens=False)
@@ -102,7 +103,13 @@ def eval_hellaswag(model, tokenizer, args):
 
             # Get logits from model
             logits = model(input_ids=input_ids, perm_mask=perm_mask, target_mapping=target_mapping)[0]
-            
+            # this sanity check passed
+            # print(f"\tlogits: {logits.shape}")
+            # print(f"\tlogits start: {logits[0, :4, :]}")
+            # print(f"\tlogits end: {logits[0, -4:, :]}")
+            # print(f"\tperm_mask start: {perm_mask[0, :4, :]}")
+            # print(f"\tperm_mask end: {perm_mask[0, -4:, :]}")
+
             # Calculate log probabilities
             log_probs = torch.nn.functional.log_softmax(logits, dim=-1)
             

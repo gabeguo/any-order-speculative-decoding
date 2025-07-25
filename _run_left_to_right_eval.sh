@@ -14,11 +14,11 @@
 # TODO: Download the evaluation dataset from https://github.com/HKUNLP/DiffuLLaMA/blob/main/evaluation/evaluation/cloze_test_val__spring2016.csv
 # and put it in the eval_datasets folder
 
-max_items=2000
+max_items=10010
 num_trials=1
 T=1
 
-for task in "lambada" "hellaswag"; do
+for task in "hellaswag"; do
     output_dir="/atlas/u/gabeguo/neurips_2025/rebuttal/${task}"
     output_dir_finetuned="${output_dir}/xlnet_finetuned"
     python eval_infilling.py \
