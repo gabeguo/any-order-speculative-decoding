@@ -121,30 +121,100 @@ def eval_hellaswag(model, tokenizer, args):
 
     return
 
+def eval_lambada(model, tokenizer, args):
+    from datasets import load_dataset
+    dataset = load_dataset("lambada", streaming=True)["test"]
+    for item in dataset:
+        # Each item has 'text' field with full text
+        # Split into context and target
+        text = item["text"]
+        words = text.split()
+        context = " ".join(words[:-1])
+        target = words[-1]
+        problems.append([context, target])
+    
+    samples = []
+    total_cnt = 0
+    gens = []
+    refs = []
+    nfe_counts = list()
+    infill_lengths = list()
+
+    print(len(problems))
+    for the_trial in range(args.num_trials): # have multiple trials
+      print(f"Trial {the_trial}")
+      for stories in tqdm(problems[:args.max_items]):
+        print("\n\n")
+        total_cnt += 1
+
+        context = stories[0]
+        completion = stories[1]
+
+        prefix = tokenizer.encode(context, add_special_tokens=False)
+        gt_suffix = tokenizer.encode(completion, add_special_tokens=False)
+        masked_suffix = [tokenizer.mask_token_id for _ in range(len(gt_suffix))]
+        assert all([x == 6 for x in masked_suffix])
+
+        input_ids = torch.tensor(prefix + masked_suffix)
+        
+        sigma, num_visible = create_sigma(input_ids)
+        assert sigma.shape == (input_ids.shape[-1],)
+        sigma = sigma.unsqueeze(0).to(device="cuda")
+
+        input_ids = input_ids.unsqueeze(0).to(device="cuda")
+        print(f"prompt: {tokenizer.decode(input_ids[0])}")
+
+        assert sigma.shape == input_ids.shape
+        
+        new_sequence, nfe_count = speculative_decoding(model=model, tokenizer=tokenizer, prompt_tokens=input_ids, sigma=sigma, start=num_visible, T=args.T)
+        assert torch.all(new_sequence != 6)
+        pred = tokenizer.decode(new_sequence.tolist()[0][len(prefix):])
+        assert "<mask>" not in pred
+
+        print(f"completed: {tokenizer.decode(new_sequence[0])}")
+        print(f"infilled portion: {pred}")
+        print(f"nfe_count: {nfe_count}")
+        print(f"num_tokens_predicted: {len(gt_suffix)}")
+        assert nfe_count <= len(gt_suffix), f"{nfe_count} vs {len(gt_suffix)}"
+        nfe_counts.append(nfe_count)
+        infill_lengths.append(len(gt_suffix))
+    
+        samples.append(dict(pred=pred, label=gt_suffix, prefix=context))
+        gens.append(pred)
+        refs.append(completion)
+
+    # LAMBADA evaluation with exact match accuracy
+    correct = sum(1 for pred, ref in zip(gens, refs) if pred.strip() == ref.strip())
+    accuracy = (correct / len(gens)) * 100
+    results = {"accuracy": accuracy}
+    print(f"Exact match accuracy: {accuracy:.2f}%")
+
+    # Add NFE and infill length stats for all datasets
+    results["nfe_count"] = (np.mean(nfe_counts), np.std(nfe_counts))
+    results["infill_lengths"] = (np.mean(infill_lengths), np.std(infill_lengths))
+
+    args.output_dir = create_output_path(args)
+    os.makedirs(args.output_dir, exist_ok=True)
+    with open(os.path.join(args.output_dir, 'samples.jsonl'), 'w') as f:
+        for json_obj in samples:
+            f.write(json.dumps(json_obj) + '\n')
+    with open(os.path.join(args.output_dir, 'metrics.json'), 'w') as fout:
+        json.dump(results, fout, indent=4)
+    with open(os.path.join(args.output_dir, 'args.json'), 'w') as fout:
+        json.dump(vars(args), fout, indent=4)
+
+    return
+
 def eval_infilling(model, tokenizer, args):
     problems = []
     
-    if args.dataset == "roc":
-        with open(f"eval_datasets/cloze_test_val__spring2016.csv") as f:
-            reader = csv.reader(f)
-            next(reader)
-            for row in reader:
-                sents = row[1:-3] + [row[-3] if row[-1] == "1" else row[-2]]
-                problems.append(sents)
-    elif args.dataset == "lambada":
-        from datasets import load_dataset
-        dataset = load_dataset("lambada", streaming=True)["test"]
-        for item in dataset:
-            # Each item has 'text' field with full text
-            # Split into context and target
-            text = item["text"]
-            words = text.split()
-            context = " ".join(words[:-1])
-            target = words[-1]
-            problems.append([context, target])
-    else:
-        raise ValueError(f"Unknown dataset: {args.dataset}")
-    
+    with open(f"eval_datasets/cloze_test_val__spring2016.csv") as f:
+        reader = csv.reader(f)
+        next(reader)
+        for row in reader:
+            sents = row[1:-3] + [row[-3] if row[-1] == "1" else row[-2]]
+            problems.append(sents)
+   
     samples = []
     total_cnt = 0
     gens = []
@@ -204,22 +274,13 @@ def eval_infilling(model, tokenizer, args):
         gens.append(pred)
         refs.append(middle)
 
-    if args.dataset == "roc":
-        # ROC Stories evaluation with ROUGE
-        rouge = evaluate.load("rouge")
-        results = rouge.compute(predictions=gens, references=refs)
-        for key in results.keys():
-            results[key] *= 100
-        results["rougeAvg"] = (results["rouge1"] + results["rouge2"] + results["rougeL"]) / 3
-        print(f"rouge1={results['rouge1']:.2f}, rouge2={results['rouge2']:.2f}, rougeL={results['rougeL']:.2f}, rougeAvg={results['rougeAvg']:.2f}")
-    elif args.dataset == "lambada":
-        # LAMBADA evaluation with exact match accuracy
-        correct = sum(1 for pred, ref in zip(gens, refs) if pred.strip() == ref.strip())
-        accuracy = (correct / len(gens)) * 100
-        results = {"accuracy": accuracy}
-        print(f"Exact match accuracy: {accuracy:.2f}%")
-    else:
-        raise ValueError(f"Unknown dataset: {args.dataset}")
+    # ROC Stories evaluation with ROUGE
+    rouge = evaluate.load("rouge")
+    results = rouge.compute(predictions=gens, references=refs)
+    for key in results.keys():
+        results[key] *= 100
+    results["rougeAvg"] = (results["rouge1"] + results["rouge2"] + results["rougeL"]) / 3
+    print(f"rouge1={results['rouge1']:.2f}, rouge2={results['rouge2']:.2f}, rougeL={results['rougeL']:.2f}, rougeAvg={results['rougeAvg']:.2f}")
 
     # Add NFE and infill length stats for all datasets
     results["nfe_count"] = (np.mean(nfe_counts), np.std(nfe_counts))
@@ -274,7 +335,10 @@ def main(args):
 
     if args.dataset == "hellaswag":
         eval_hellaswag(model, tokenizer, args)
+    elif args.dataset == "lambada":
+        eval_lambada(model, tokenizer, args)
     else:
+        assert args.dataset == "roc"
         eval_infilling(model, tokenizer, args)
 
     return
