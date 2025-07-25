@@ -64,15 +64,86 @@ def create_sigma_for_loop(input_ids, mask_token_id=6):
     assert counter == seqlen
     return sigma
 
+def eval_hellaswag(model, tokenizer, args):
+    from datasets import load_dataset
+    dataset = load_dataset("hellaswag", streaming=True)["test"]
+    total_correct = 0
+    total_cnt = 0
+    for item_idx, item in enumerate(tqdm(dataset)):
+        if item_idx > args.max_items:
+            break
+        # Each item has 'ctx' (context) and 'endings' (list of possible endings)
+        context = item["ctx"]
+        highest_log_prob = -float("inf")
+        highest_ending = None
+        for option_idx, ending in enumerate(item["endings"]):
+            the_string = context + " " + ending
+            input_ids = tokenizer.encode(the_string, add_special_tokens=False)
+
+            sigma, num_visible = create_sigma(input_ids)
+            assert sigma.shape == (input_ids.shape[-1],)
+            sigma = sigma.unsqueeze(0).to(device="cuda")
+            input_ids = input_ids.unsqueeze(0).to(device="cuda")
+
+            # Get logits from model
+            outputs = model(input_ids=input_ids, sigma=sigma)
+            logits = outputs.logits
+            
+            # Calculate log probabilities
+            log_probs = F.log_softmax(logits, dim=-1)
+            
+            assert log_probs.shape == (input_ids.shape[0], input_ids.shape[1], log_probs.shape[-1])
+            # Get the predicted token probabilities by gathering along sequence dimension
+            token_log_probs = log_probs.gather(-1, input_ids.unsqueeze(-1)).squeeze(-1)
+            assert token_log_probs.shape == (1, input_ids.shape[1])
+
+            # Sum log probs for the visible tokens only
+            sequence_log_prob = token_log_probs.sum()
+            if sequence_log_prob > highest_log_prob:
+                highest_log_prob = sequence_log_prob
+                highest_ending = option_idx
+        curr_correct = 1 if option_idx == int(item["label"]) else 0
+        total_correct += curr_correct
+        total_cnt += 1
+        print(f"\tcontext: {context}")
+        print(f"\tcorrect ending: {item['label']}")
+        print(f"\tpredicted ending: {highest_ending}")
+        print(f"\tlog prob: {highest_log_prob}")
+        print(f"\tcorrect: {curr_correct}")
+    print(f"total correct: {total_correct}, total cnt: {total_cnt}, accuracy: {total_correct / total_cnt}")
+
+    args.output_dir = create_output_path(args)
+    os.makedirs(args.output_dir, exist_ok=True)
+    with open(os.path.join(args.output_dir, 'metrics.json'), 'w') as fout:
+        json.dump({"acc": total_correct / total_cnt}, fout, indent=4)
+    with open(os.path.join(args.output_dir, 'args.json'), 'w') as fout:
+        json.dump(vars(args), fout, indent=4)
+
+    return
+
 def eval_infilling(model, tokenizer, args):
     problems = []
-    with open(f"eval_datasets/cloze_test_val__spring2016.csv") as f:
-        reader = csv.reader(f)
-        next(reader)
-        for row in reader:
-            sents = row[1:-3] + [row[-3] if row[-1] == "1" else row[-2]]
-            # sents = [s if i == 0 else " " + s for i, s in enumerate(sents)]
-            problems.append(sents)
+    
+    if args.dataset == "roc":
+        with open(f"eval_datasets/cloze_test_val__spring2016.csv") as f:
+            reader = csv.reader(f)
+            next(reader)
+            for row in reader:
+                sents = row[1:-3] + [row[-3] if row[-1] == "1" else row[-2]]
+                problems.append(sents)
+    elif args.dataset == "lambada":
+        from datasets import load_dataset
+        dataset = load_dataset("lambada", streaming=True)["test"]
+        for item in dataset:
+            # Each item has 'text' field with full text
+            # Split into context and target
+            text = item["text"]
+            words = text.split()
+            context = " ".join(words[:-1])
+            target = words[-1]
+            problems.append([context, target])
+    else:
+        raise ValueError(f"Unknown dataset: {args.dataset}")
     
     samples = []
     total_cnt = 0
@@ -133,12 +204,24 @@ def eval_infilling(model, tokenizer, args):
         gens.append(pred)
         refs.append(middle)
 
-    rouge = evaluate.load("rouge")
-    results = rouge.compute(predictions=gens, references=refs)
-    for key in results.keys():
-        results[key] *= 100
-    results["rougeAvg"] = (results["rouge1"] + results["rouge2"] + results["rougeL"]) / 3
-    print(f"rouge1={results['rouge1']:.2f}, rouge2={results['rouge2']:.2f}, rougeL={results['rougeL']:.2f}, rougeAvg={results['rougeAvg']:.2f}")
+    if args.dataset == "roc":
+        # ROC Stories evaluation with ROUGE
+        rouge = evaluate.load("rouge")
+        results = rouge.compute(predictions=gens, references=refs)
+        for key in results.keys():
+            results[key] *= 100
+        results["rougeAvg"] = (results["rouge1"] + results["rouge2"] + results["rougeL"]) / 3
+        print(f"rouge1={results['rouge1']:.2f}, rouge2={results['rouge2']:.2f}, rougeL={results['rougeL']:.2f}, rougeAvg={results['rougeAvg']:.2f}")
+    elif args.dataset == "lambada":
+        # LAMBADA evaluation with exact match accuracy
+        correct = sum(1 for pred, ref in zip(gens, refs) if pred.strip() == ref.strip())
+        accuracy = (correct / len(gens)) * 100
+        results = {"accuracy": accuracy}
+        print(f"Exact match accuracy: {accuracy:.2f}%")
+    else:
+        raise ValueError(f"Unknown dataset: {args.dataset}")
+
+    # Add NFE and infill length stats for all datasets
     results["nfe_count"] = (np.mean(nfe_counts), np.std(nfe_counts))
     results["infill_lengths"] = (np.mean(infill_lengths), np.std(infill_lengths))
 
@@ -165,6 +248,7 @@ def parse_args():
     parser.add_argument("--num_trials", type=int, default=1)
     parser.add_argument("--short_prompt", action="store_true")
     parser.add_argument("--hf_revision", type=str, default="nlp")
+    parser.add_argument("--dataset", type=str, default="roc", choices=["roc", "lambada", "hellaswag"])
     return parser.parse_args()
 
 def main(args):
@@ -188,7 +272,10 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained("xlnet/xlnet-base-cased")
 
-    eval_infilling(model, tokenizer, args)
+    if args.dataset == "hellaswag":
+        eval_hellaswag(model, tokenizer, args)
+    else:
+        eval_infilling(model, tokenizer, args)
 
     return
 
