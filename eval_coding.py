@@ -51,6 +51,7 @@ def create_sigma(input_ids, mask_token_id=6):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--finetuned_model_dir", type=str, default=PRETRAINED_MODEL)
+    parser.add_argument("--hf_revision", type=str, default="code")
     parser.add_argument("--output_dir", type=str, default="/atlas/u/gabeguo/humaneval_infill_results")
     parser.add_argument("--max_tasks", type=int, default=2000)
     parser.add_argument("--num_samples_per_task", type=int, default=1)
@@ -66,7 +67,7 @@ def main(args):
         model = XLNetLMHeadModel.from_pretrained(
             PRETRAINED_MODEL,
             use_safetensors=True,
-            revision="code").cuda()
+            revision=args.hf_revision).cuda()
     else:
         print(f"Loading finetuned model from {args.finetuned_model_dir}")
         model = XLNetLMHeadModel.from_pretrained(
