@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 from packed_dataset import PackedDataset
 from datasets import load_dataset
+import numpy as np
 
 from speculative_decoding import speculative_decoding, create_gt_perm_mask
 from finetune_xlnet_distributed import create_pos_to_rank
