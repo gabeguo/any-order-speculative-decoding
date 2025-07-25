@@ -11,11 +11,11 @@
 #SBATCH --ntasks=1             # Number of tasks (one per GPU)
 
 # TODO: change output_dir and --finetuned_model_dir
-output_dir="/atlas/u/gabeguo/dummy_runs/speculative_decoding"
+output_dir="/atlas/u/gabeguo/neurips_2025/speculative_decoding/kv_cache"
 
 python run_decoding_eval.py \
     --finetuned_model_dir therealgabeguo/ASARM \
-    --start_percentage 0.05 \
+    --start_percentage 0.875 \
     --num_trials 100 \
     --eps 0 \
     --k 5 \
