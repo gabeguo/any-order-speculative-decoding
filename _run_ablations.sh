@@ -11,7 +11,7 @@
 #SBATCH --ntasks=1             # Number of tasks (one per GPU)
 
 # TODO: change output_dir and --finetuned_model_dir
-for k in 2 3 5 10 15 20; do
+for k in 2 3 4 5 6 7 8 9 10 15 20; do
     for max_length in 128 256 512 1024; do
         output_dir="/atlas/u/gabeguo/neurips_2025/speculative_decoding/ablations/k_${k}_max_length_${max_length}"
 
@@ -24,7 +24,7 @@ for k in 2 3 5 10 15 20; do
             --max_length $max_length \
             --T 1 \
             --output_dir $output_dir \
-            --hf_revision nlp_210k_plus_75k \
+            --hf_revision nlp \
             --skip_off_the_shelf \
             --skip_ngram
         python eval_perplexity.py \
