@@ -123,7 +123,7 @@ def eval_hellaswag(model, tokenizer, args):
             if sequence_log_prob > highest_log_prob:
                 highest_log_prob = sequence_log_prob
                 highest_ending = option_idx
-        curr_correct = 1 if option_idx == int(item["label"]) else 0
+        curr_correct = 1 if highest_ending == int(item["label"]) else 0
         total_correct += curr_correct
         total_cnt += 1
         print(f"\tcontext: {context}")
