@@ -21,7 +21,7 @@ python -O run_decoding_eval.py \
     --k 5 \
     --T 1 \
     --output_dir $output_dir \
-    --hf_revision nlp_210k_plus_75k \
+    --hf_revision nlp \
     --skip_off_the_shelf
 python eval_perplexity.py \
     --perplexity_model "gpt2-large" \
