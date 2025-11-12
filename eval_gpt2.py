@@ -12,46 +12,11 @@ import logging
 import random
 from datasets import load_dataset
 import argparse
+from eval_perplexity import eval_perplexity, calculate_entropy
+import scipy.stats as stats
 
 # Suppress transformers warnings
 logging.getLogger("transformers").setLevel(logging.ERROR)
-
-def calculate_perplexity(text, model, tokenizer, device):
-    """
-    Calculates the perplexity of a given text using a specified model.
-    """
-    try:
-        # Tokenize the text
-        inputs = tokenizer(text, return_tensors="pt").to(device)
-        input_ids = inputs.input_ids
-        
-        # Max sequence length for the evaluator model (e.g., 1024 for gpt2-large)
-        max_length = model.config.n_positions
-        
-        # If text is too long, truncate it
-        if input_ids.shape[1] > max_length:
-            input_ids = input_ids[:, :max_length]
-            
-        # We use the input_ids as labels. The model will automatically
-        # shift them for loss calculation.
-        labels = input_ids
-
-        # Run the model forward, with no gradients
-        with torch.no_grad():
-            outputs = model(input_ids, labels=labels)
-            
-            # The loss is the negative log-likelihood (cross-entropy)
-            loss = outputs.loss
-            
-            # Perplexity is the exponential of the loss
-            perplexity = torch.exp(loss)
-            
-        return perplexity.item()
-        
-    except Exception as e:
-        print(f"Error calculating perplexity: {e}")
-        # Return a high PPL or NaN on failure
-        return float('nan')
 
 def run_benchmark(
     gen_model_name="gpt2",
@@ -148,21 +113,24 @@ def run_benchmark(
             # C. Decode the output
             text = gen_tokenizer.decode(output_ids[0], skip_special_tokens=True)
             generated_texts.append(text)
-            
-            # D. Calculate perplexity
-            ppl = calculate_perplexity(text, eval_model, eval_tokenizer, device)
-            perplexities.append(ppl)
 
         # --- 4. Store Results for Scenario ---
-        valid_perplexities = [p for p in perplexities if not np.isnan(p)]
+        perplexities = eval_perplexity(argparse.Namespace(
+            perplexity_model=eval_model_name,
+            batch_size=8
+        ), generated_texts)["perplexities"]
+        entropies = calculate_entropy(generated_texts)
         
         all_results[scenario_key] = {
             "mean_time_s": np.mean(timings),
-            "std_time_s": np.std(timings),
-            "mean_perplexity": np.mean(valid_perplexities),
-            "std_perplexity": np.std(valid_perplexities),
+            "sem_time_s": stats.sem(timings),
+            "mean_perplexity": np.mean(perplexities),
+            "sem_perplexity": stats.sem(perplexities),
+            "mean_entropy": np.mean(entropies),
+            "sem_entropy": stats.sem(entropies),
             "all_timings_s": timings,
             "all_perplexities": perplexities,
+            "all_entropies": entropies,
             "outputs": generated_texts # Just save the first one
         }
         
