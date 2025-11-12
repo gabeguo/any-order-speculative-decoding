@@ -668,7 +668,7 @@ def main():
                         }
                         torch.save(training_state, os.path.join(args.output_dir, "best", "training_state.pt"))
                 # Validation! (On all threads)
-                if total_steps % args.eval_steps == 0:
+                if args.eval_steps > 0 and total_steps % args.eval_steps == 0:
                     # Synchronize all processes before validation
                     if args.local_rank != -1: # non-main processes can also do validation
                         print(f"Rank {args.local_rank} waiting for barrier starting val")
