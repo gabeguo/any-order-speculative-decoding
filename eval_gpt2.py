@@ -1,3 +1,6 @@
+import os
+os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
+
 import torch
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -193,6 +196,8 @@ if __name__ == "__main__":
     # 2. Save this code as gpt2_benchmark.py
     # 3. Run from your terminal: python gpt2_benchmark.py
     args = parse_args()
+
+    os.makedirs(args.output_dir, exist_ok=True)
     
     run_benchmark(
         gen_model_name=args.gen_model_name,
