@@ -14,6 +14,7 @@ from datasets import load_dataset
 import argparse
 from eval_perplexity import eval_perplexity, calculate_entropy
 import scipy.stats as stats
+from datetime import datetime
 
 # Suppress transformers warnings
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -73,6 +74,7 @@ def run_benchmark(
         timings = []
         perplexities = []
         generated_texts = []
+        prompts = []
 
         for trial in tqdm(range(min(n_trials, len(valid_texts))), desc=f"Generating {n_trials} sequences"):
 
@@ -113,6 +115,7 @@ def run_benchmark(
             # C. Decode the output
             text = gen_tokenizer.decode(output_ids[0], skip_special_tokens=True)
             generated_texts.append(text)
+            prompts.append(gen_tokenizer.decode(doc_tokens[start_index:end_index], skip_special_tokens=True))
 
         # --- 4. Store Results for Scenario ---
         perplexities = eval_perplexity(argparse.Namespace(
@@ -131,7 +134,8 @@ def run_benchmark(
             "all_timings_s": timings,
             "all_perplexities": perplexities,
             "all_entropies": entropies,
-            "outputs": generated_texts # Just save the first one
+            "outputs": generated_texts,
+            "prompts": prompts,
         }
         
         print(f"Results for {scenario_key}:")
@@ -165,6 +169,7 @@ if __name__ == "__main__":
     # 3. Run from your terminal: python gpt2_benchmark.py
     args = parse_args()
 
+    args.output_dir = os.path.join(args.output_dir, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     os.makedirs(args.output_dir, exist_ok=True)
     
     run_benchmark(
