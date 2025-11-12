@@ -96,6 +96,7 @@ def parse_args():
     parser.add_argument('--no_cuda', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--use_hf_model', action='store_true')
+    parser.add_argument('--train_from_scratch', action='store_true')
     
     args = parser.parse_args()
     return args
