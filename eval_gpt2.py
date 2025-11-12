@@ -163,7 +163,7 @@ def run_benchmark(
             "std_perplexity": np.std(valid_perplexities),
             "all_timings_s": timings,
             "all_perplexities": perplexities,
-            "example_output": generated_texts[0] # Just save the first one
+            "outputs": generated_texts # Just save the first one
         }
         
         print(f"Results for {scenario_key}:")
