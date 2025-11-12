@@ -8,6 +8,7 @@ from tqdm import tqdm
 import logging
 import random
 from datasets import load_dataset
+import argparse
 
 # Suppress transformers warnings
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -53,7 +54,9 @@ def run_benchmark(
     gen_model_name="gpt2",
     eval_model_name="gpt2-large",
     n_trials=10,
-    seq_length=512
+    seq_length=512,
+    prompt_percent=0.05,
+    output_dir="/atlas/u/gabeguo/iclr2026_rebuttal",
 ):
     """
     Main function to run the generation and perplexity benchmark.
@@ -64,10 +67,10 @@ def run_benchmark(
     print(f"Using device: {device}")
     
     # Calculate prompt length
-    prompt_token_length = int(seq_length * 0.05)
+    prompt_token_length = int(seq_length * prompt_percent)
     if prompt_token_length == 0:
         prompt_token_length = 1 # ensure at least 1 token
-    print(f"Using prompt length of {prompt_token_length} tokens (5% of {seq_length}).")
+    print(f"Using prompt length of {prompt_token_length} tokens ({prompt_percent} of {seq_length}).")
     
     all_results = {}
 
@@ -102,20 +105,14 @@ def run_benchmark(
         timings = []
         perplexities = []
         generated_texts = []
-        
-        for _ in tqdm(range(n_trials), desc=f"Generating {n_trials} sequences"):
-            
+
+        for trial in tqdm(range(min(n_trials, len(valid_texts))), desc=f"Generating {n_trials} sequences"):
+
             # A. Create the prompt
             # Select a random document
-            doc_text = " " # Default in case loop fails
-            doc_tokens_len = 0
-            
-            # Ensure we get a document that's long enough
-            while doc_tokens_len <= prompt_token_length:
-                doc_text = random.choice(valid_texts)
-                # Tokenize the entire document
-                doc_tokens = gen_tokenizer.encode(doc_text)
-                doc_tokens_len = len(doc_tokens)
+            doc_text = valid_texts[trial] # Default in case loop fails
+            doc_tokens = gen_tokenizer.encode(doc_text)
+            doc_tokens_len = len(doc_tokens)
 
             # Select a random start index for the prompt
             start_index = random.randint(0, doc_tokens_len - prompt_token_length - 1)
@@ -171,7 +168,7 @@ def run_benchmark(
         print(f"  Mean PPL:  {all_results[scenario_key]['mean_perplexity']:.3f}")
 
     # --- 5. Save Final JSON Output ---
-    output_filename = "generation_benchmark.json"
+    output_filename = f"{output_dir}/generation_benchmark.json"
     with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=4)
         
@@ -179,11 +176,29 @@ def run_benchmark(
     print("\nFinal Summary:")
     print(json.dumps(all_results, indent=2, default=str))
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gen_model_name", default="gpt2", type=str)
+    parser.add_argument("--eval_model_name", default="gpt2-large", type=str)
+    parser.add_argument("--n_trials", default=10, type=int)
+    parser.add_argument("--seq_length", default=512, type=int)
+    parser.add_argument("--prompt_percent", default=0.05, type=float)
+    parser.add_argument("--output_dir", default="/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison")
+    return parser.parse_args()
+
 if __name__ == "__main__":
     # To run the script:
     # 1. Make sure you have the required libraries:
     #    pip install torch transformers numpy tqdm datasets
     # 2. Save this code as gpt2_benchmark.py
     # 3. Run from your terminal: python gpt2_benchmark.py
+    args = parse_args()
     
-    run_benchmark()
+    run_benchmark(
+        gen_model_name=args.gen_model_name,
+        eval_model_name=args.eval_model_name,
+        n_trials=args.n_trials,
+        seq_length=args.seq_length,
+        prompt_percent=args.prompt_percent,
+        output_dir=args.output_dir,
+    )
