@@ -69,6 +69,7 @@ def parse_args():
     parser.add_argument("--loss_scale_type", type=str, default=SCALE_BY_NONE, choices=[SCALE_BY_SNR, SCALE_BY_MASKING_RATE, SCALE_BY_NONE])
     parser.add_argument("--packed_dataset", action="store_true")
     parser.add_argument("--any_permutation", action="store_true")
+    parser.add_argument("--left_to_right", action="store_true")
     parser.add_argument("--dataset", type=str, default=OPENWEBTEXT_DATASET, choices=[OPENWEBTEXT_DATASET, CODE_DATASET])
 
     # Beta testing parameters
@@ -280,6 +281,8 @@ def calc_joint_perm_mask(args, batch_size, seq_length, masking_rate, labels):
 
     if args.any_permutation:
         pos_to_rank = torch.randperm(seq_length)
+    elif args.left_to_right:
+        pos_to_rank = torch.arange(seq_length)
     else:
         # calculate the mask, based on the number of visible tokens
         pos_to_rank = create_pos_to_rank(seq_length, curr_masking_rate=masking_rate, fixed_visible_ratio=True) # pos_to_rank[i] = the order in which we decode the token at index i
@@ -349,7 +352,10 @@ def do_speculative_decoding(args, model, tokenizer, batch, device, is_main_proce
         index_looping = tqdm(index_looping)
     for item_idx in index_looping:
         for _ in range(args.eval_num_decodes):
-            sigma = create_pos_to_rank(batch["input_ids"].shape[1], curr_masking_rate=args.eval_masking_rate, fixed_visible_ratio=True).unsqueeze(0)
+            if args.left_to_right:
+                sigma = torch.arange(batch["input_ids"].shape[1]).unsqueeze(0)
+            else:
+                sigma = create_pos_to_rank(batch["input_ids"].shape[1], curr_masking_rate=args.eval_masking_rate, fixed_visible_ratio=True).unsqueeze(0)
             # TODO: adversarailly alter this just to make sure
             decode_start = int(batch["input_ids"].shape[1] * (1 - args.eval_masking_rate)) + 1 # start at first masked token, consistent with create_pos_to_rank
             speculative_decoding_input = batch["input_ids"][item_idx:item_idx+1].clone()
