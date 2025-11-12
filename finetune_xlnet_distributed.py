@@ -19,6 +19,7 @@ from transformers import (
     AutoTokenizer,
     GPT2Tokenizer,
     XLNetLMHeadModel,
+    XLNetConfig,
     get_linear_schedule_with_warmup
 )
 from tqdm import tqdm
@@ -475,6 +476,10 @@ def main():
         total_steps = training_state['total_steps']
         best_loss = training_state['best_loss']
         max_masking_rate = training_state['max_masking_rate']
+    elif args.train_from_scratch:
+        print(f"Initializing model {args.model_name} from scratch")
+        config = XLNetConfig.from_pretrained(args.model_name, cache_dir=args.cache_dir)
+        model = XLNetLMHeadModel(config)
     else:
         print(f"Initializing model: {args.model_name}")
         model = XLNetLMHeadModel.from_pretrained(args.model_name, cache_dir=args.cache_dir)
