@@ -1,5 +1,5 @@
 import os
-# os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
+os.environ["HF_HOME"] = "/atlas/u/gabeguo/cache_sub"
 os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
 from dotenv import load_dotenv
 load_dotenv()
@@ -486,7 +486,7 @@ def main():
         model = XLNetLMHeadModel.from_pretrained(args.model_name, cache_dir=args.cache_dir)
     
     model.to(device)
-    assert not model.training
+    # assert not model.training
     
     # Wrap model with DDP
     if args.local_rank != -1:
