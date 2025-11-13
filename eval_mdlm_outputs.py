@@ -10,6 +10,7 @@ def parse_args():
         "/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison/mdlm/sampling_steps_64/2025-11-12_201520/Wikitext_completion_mdlm_t64.json",
         "/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison/mdlm/sampling_steps_128/2025-11-12_201726/Wikitext_completion_mdlm_t128.json",
         "/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison/mdlm/sampling_steps_256/2025-11-12_202102/Wikitext_completion_mdlm_t256.json",
+        "/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison/mdlm/sampling_steps_512/2025-11-12_204627/Wikitext_completion_mdlm_t512.json",
     ])
     parser.add_argument("--perplexity_model", type=str, default="gpt2-large")
     parser.add_argument("--batch_size", type=int, default=8)
