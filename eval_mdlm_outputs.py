@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import scipy.stats as stats
 import json
+import os
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate MDLM outputs")
