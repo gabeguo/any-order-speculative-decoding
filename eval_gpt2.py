@@ -15,6 +15,7 @@ import argparse
 from eval_perplexity import eval_perplexity, calculate_entropy
 import scipy.stats as stats
 from datetime import datetime
+import json
 
 # Suppress transformers warnings
 logging.getLogger("transformers").setLevel(logging.ERROR)
@@ -181,3 +182,6 @@ if __name__ == "__main__":
         prompt_percent=args.prompt_percent,
         output_dir=args.output_dir,
     )
+
+    with open(f"{args.output_dir}/args.json", "w", encoding="utf-8") as f:
+        json.dump(vars(args), f, indent=4)
