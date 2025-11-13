@@ -43,7 +43,7 @@ def main(args):
         sem_time = stats.sem(results_dict["timings"])
         print(f"\tTiming: {avg_time:.4f}; {sem_time:.4f}")
 
-        savedir = os.path.basename(results_file)
+        savedir = os.path.dirname(results_file)
         with open(f"{savedir}/eval_results.json", 'w') as f:
             json.dump({
                 "perplexity": {
