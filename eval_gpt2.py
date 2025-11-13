@@ -101,6 +101,7 @@ def run_benchmark(
             with torch.no_grad():
                 output_ids = gen_model.generate(
                     input_ids,
+                    do_sample=True,
                     max_length=seq_length,
                     use_cache=use_cache,
                     pad_token_id=gen_tokenizer.eos_token_id
