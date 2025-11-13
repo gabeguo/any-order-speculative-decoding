@@ -33,7 +33,7 @@ def run_benchmark(
     """
     
     # --- 1. Setup ---
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" # if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
     
     # Calculate prompt length
@@ -157,7 +157,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gen_model_name", default="gpt2", type=str)
     parser.add_argument("--eval_model_name", default="gpt2-large", type=str)
-    parser.add_argument("--n_trials", default=10, type=int)
+    parser.add_argument("--n_trials", default=50, type=int)
     parser.add_argument("--seq_length", default=512, type=int)
     parser.add_argument("--prompt_percent", default=0.05, type=float)
     parser.add_argument("--output_dir", default="/atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison")
