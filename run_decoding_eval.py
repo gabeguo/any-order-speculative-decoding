@@ -167,7 +167,10 @@ def main(args):
             input_ids[:len(prompt)] = prompt
         input_ids = input_ids.unsqueeze(0).to(device="cuda")
         assert len(input_ids.shape) == 2
-        start = int(input_ids.shape[1] * args.start_percentage) + 1
+        if args.alt_prompt_loading:
+            start = prompt_token_length
+        else:
+            start = int(input_ids.shape[1] * args.start_percentage) + 1
         # For each trial, give a different permutation
         # TODO: slightly modify this so that we don't break left-to-right ordering after the prompt
         if args.left_to_right: # want to do left-to-right AR decoding
