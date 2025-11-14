@@ -88,6 +88,8 @@ def run_benchmark(
             # Select a random start index for the prompt
             start_index = random.randint(0, doc_tokens_len - prompt_token_length - 1)
             end_index = start_index + prompt_token_length
+
+            print(f"prompt length: {end_index - start_index}")
             
             # Get the prompt tokens and format as a batch (unsqueeze)
             input_ids = torch.tensor(doc_tokens[start_index:end_index]).unsqueeze(0).to(device)
@@ -104,6 +106,7 @@ def run_benchmark(
                     input_ids,
                     do_sample=True,
                     max_length=seq_length,
+                    min_length=seq_length,
                     use_cache=use_cache,
                     pad_token_id=gen_tokenizer.eos_token_id
                 )
@@ -115,6 +118,7 @@ def run_benchmark(
             timings.append(end_time - start_time)
             
             # C. Decode the output
+            print("output length:", len(output_ids[0]))
             text = gen_tokenizer.decode(output_ids[0], skip_special_tokens=True)
             generated_texts.append(text)
             prompts.append(gen_tokenizer.decode(doc_tokens[start_index:end_index], skip_special_tokens=True))
