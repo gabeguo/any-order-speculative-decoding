@@ -14,6 +14,7 @@ from datasets import load_dataset
 from speculative_decoding import speculative_decoding, create_gt_perm_mask
 from finetune_xlnet_distributed import create_pos_to_rank
 from tqdm import tqdm
+import random
 
 OFF_THE_SHELF_KEY = "off_the_shelf"
 FINETUNED_KEY = "finetuned"
@@ -53,6 +54,7 @@ def parse_args():
     parser.add_argument("--use_openwebtext", action="store_true")
     parser.add_argument("--max_length", type=int, default=512)
     parser.add_argument("--left_to_right", action="store_true")
+    parser.add_argument("--alt_prompt_loading", action="store_true")
     parser.add_argument("--r_atol", type=float, default=0)
     return parser.parse_args()
 
@@ -123,7 +125,14 @@ def main(args):
     else:
         ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", streaming=True)
         test_ds = ds["test"]
-    packed_ds = PackedDataset(test_ds, tokenizer, max_length=args.max_length, is_code=False)
+    if args.alt_prompt_loading:
+        test_ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
+        prompt_token_length = int(args.max_length * args.start_percentage)
+        min_prompt_chars = prompt_token_length * 5 # A rough filter
+        packed_ds = [text for text in test_ds["text"] if len(text.strip()) > min_prompt_chars]
+        print(f"Loaded {len(packed_ds)} valid documents from WikiText 'test' split.")
+    else:
+        packed_ds = PackedDataset(test_ds, tokenizer, max_length=args.max_length, is_code=False)
 
     results_dict = dict()
     for model_name in [OFF_THE_SHELF_KEY, FINETUNED_KEY]:
@@ -141,6 +150,21 @@ def main(args):
     for trial, input_ids in tqdm(enumerate(packed_ds), total=args.num_trials):
         if trial >= args.num_trials:
             break
+        if args.alt_prompt_loading:
+            assert args.left_to_right, "alt prompt loading only works with left-to-right decoding"
+            
+            input_ids = torch.tensor(tokenizer.encode(input_ids, max_length=args.max_length, truncation=True))
+
+            doc_tokens_len = len(input_ids.tolist())
+
+            # Select a random start index for the prompt
+            start_index = random.randint(0, doc_tokens_len - prompt_token_length - 1)
+            end_index = start_index + prompt_token_length
+            
+            # Get the prompt tokens and format as a batch (unsqueeze)
+            prompt = input_ids[start_index:end_index]
+            input_ids = torch.full((args.max_length,), 6, dtype=input_ids.dtype)
+            input_ids[:len(prompt)] = prompt
         input_ids = input_ids.unsqueeze(0).to(device="cuda")
         assert len(input_ids.shape) == 2
         start = int(input_ids.shape[1] * args.start_percentage) + 1
