@@ -120,8 +120,8 @@ def run_benchmark(
             # C. Decode the output
             print("output length:", len(output_ids[0]))
             prompts.append(gen_tokenizer.decode(doc_tokens[start_index:end_index], skip_special_tokens=True))
-            text = gen_tokenizer.decode(prompts[-1] + " " + output_ids[0], skip_special_tokens=True)
-            generated_texts.append(text)
+            text = gen_tokenizer.decode(output_ids[0], skip_special_tokens=True)
+            generated_texts.append(prompts[-1] + " " + text)
 
         # --- 4. Store Results for Scenario ---
         perplexities = eval_perplexity(argparse.Namespace(
