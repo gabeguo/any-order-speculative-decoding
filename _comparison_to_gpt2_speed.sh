@@ -11,7 +11,7 @@
 #SBATCH --ntasks=1            # Number of tasks (one per GPU)
 
 python eval_gpt2.py \
-    --n_trials 50 \
+    --n_trials 100 \
     --seq_length 512 \
     --prompt_percent 0.05 \
     --output_dir /atlas/u/gabeguo/iclr2026_rebuttal/speed_comparison/gpt2
