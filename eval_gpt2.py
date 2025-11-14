@@ -105,8 +105,8 @@ def run_benchmark(
                 output_ids = gen_model.generate(
                     input_ids,
                     do_sample=True,
-                    max_length=seq_length,
-                    min_length=seq_length,
+                    max_length=seq_length - prompt_token_length,
+                    min_length=seq_length - prompt_token_length,
                     use_cache=use_cache,
                     pad_token_id=gen_tokenizer.eos_token_id
                 )
@@ -119,9 +119,9 @@ def run_benchmark(
             
             # C. Decode the output
             print("output length:", len(output_ids[0]))
-            text = gen_tokenizer.decode(output_ids[0], skip_special_tokens=True)
-            generated_texts.append(text)
             prompts.append(gen_tokenizer.decode(doc_tokens[start_index:end_index], skip_special_tokens=True))
+            text = gen_tokenizer.decode(prompts[-1] + " " + output_ids[0], skip_special_tokens=True)
+            generated_texts.append(text)
 
         # --- 4. Store Results for Scenario ---
         perplexities = eval_perplexity(argparse.Namespace(
