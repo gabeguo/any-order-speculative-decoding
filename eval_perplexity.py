@@ -36,15 +36,26 @@ def eval_perplexity(args, predictions):
     # Truncate each sequence to 1000 tokens using GPT2-large tokenizer
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
     truncated_predictions = list()
+    lengths = list()
     for x in predictions:
         encoded = tokenizer.encode(x)
+        lengths.append(len(encoded))
         if len(encoded) > 960:
             x = tokenizer.decode(encoded[:960])
         truncated_predictions.append(x)
     results = perplexity.compute(predictions=truncated_predictions, 
                                 model_id=args.perplexity_model, 
                                 batch_size=args.batch_size)
-    return results
+    return results, lengths
+
+def eval_prompt_length(args, prompts):
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2-large')
+    lengths = list()
+    for x in prompts:
+        x = x[:x.index("_")]
+        encoded = tokenizer.encode(x)
+        lengths.append(len(encoded))
+    return lengths
 
 # https://arxiv.org/pdf/2409.02908
 def calculate_entropy(sequences):
@@ -86,10 +97,11 @@ def process_results(args, results_dict, model_name_keys, decoding_name_keys):
             
             print(f"eval {model_name} {decoding_name}")
             # Calculate perplexity scores
-            ppl_results = eval_perplexity(args, sequences)
+            ppl_results, lengths = eval_perplexity(args, sequences)
             nfe_results = results_dict[model_name][decoding_name][NFE_COUNT_KEY]
             execution_time_results = results_dict[model_name][decoding_name][EXECUTION_TIME_KEY]
-            
+            prompt_lengths = eval_prompt_length(args, results_dict["masked_prompt"])
+
             # Calculate entropy scores
             entropy_results = calculate_entropy(sequences)
             
@@ -97,6 +109,8 @@ def process_results(args, results_dict, model_name_keys, decoding_name_keys):
                 'Model': model_name,
                 'Decoding': decoding_name,
                 'PPL': (np.mean(ppl_results["perplexities"]), stats.sem(ppl_results["perplexities"])),
+                'Lengths': (np.mean(lengths), stats.sem(lengths)),
+                'Prompt_Lengths': (np.mean(prompt_lengths), stats.sem(prompt_lengths)),
                 'Entropy': (np.mean(entropy_results), stats.sem(entropy_results)),
                 NFE_COUNT_KEY: (np.mean(nfe_results), stats.sem(nfe_results)),
                 EXECUTION_TIME_KEY: (np.mean(execution_time_results), stats.sem(execution_time_results))
